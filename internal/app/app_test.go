@@ -226,3 +226,34 @@ func TestGetAllTasks(t *testing.T) {
 		t.Errorf("GetAllTasks() expected 2 tasks, got %d", len(tasks))
 	}
 }
+
+func TestGetTaskStats(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "zan_test_stats_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	setupTestEnv(t, tmpDir)
+
+	app, err := NewApp()
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	app.AddTask("Task 1", "", "", nil)
+	app.AddTask("Task 2", "", "", nil)
+	task3, _ := app.AddTask("Task 3", "", "", nil)
+	app.UpdateTask(task3.ID, "", "", task.StatusDone, "", nil) // 1つ完了
+
+	total, completed, incomplete := app.GetTaskStats()
+
+	if total != 3 {
+		t.Errorf("GetTaskStats() expected total 3, got %d", total)
+	}
+	if completed != 1 {
+		t.Errorf("GetTaskStats() expected completed 1, got %d", completed)
+	}
+	if incomplete != 2 {
+		t.Errorf("GetTaskStats() expected incomplete 2, got %d", incomplete)
+	}
+}

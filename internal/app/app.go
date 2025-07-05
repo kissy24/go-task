@@ -131,3 +131,16 @@ func (a *App) DeleteTask(id string) error {
 func (a *App) GetAllTasks() []task.Task {
 	return a.Tasks.Tasks
 }
+
+// GetTaskStats はタスクの統計情報を返します。
+func (a *App) GetTaskStats() (total, completed, incomplete int) {
+	total = len(a.Tasks.Tasks)
+	for _, t := range a.Tasks.Tasks {
+		if t.Status == task.StatusDone {
+			completed++
+		} else {
+			incomplete++
+		}
+	}
+	return
+}
