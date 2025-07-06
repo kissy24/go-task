@@ -22,6 +22,50 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load tasks: %w", err)
 	}
+
+	// If no tasks are loaded, add some dummy data for demonstration
+	if len(tasks.Tasks) == 0 {
+		now := time.Now()
+		tasks.Tasks = []task.Task{
+			{
+				ID:          uuid.New().String(),
+				Title:       "Buy groceries",
+				Description: "Milk, eggs, bread, and cheese",
+				Status:      task.StatusTODO,
+				Priority:    task.PriorityHigh,
+				Tags:        []string{"personal", "urgent"},
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			},
+			{
+				ID:          uuid.New().String(),
+				Title:       "Finish report",
+				Description: "Complete the Q3 financial report",
+				Status:      task.StatusInProgress,
+				Priority:    task.PriorityMedium,
+				Tags:        []string{"work"},
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			},
+			{
+				ID:          uuid.New().String(),
+				Title:       "Call John",
+				Description: "Discuss project updates",
+				Status:      task.StatusPending,
+				Priority:    task.PriorityLow,
+				Tags:        []string{"personal"},
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			},
+		}
+		// Save dummy data if auto-save is enabled
+		if tasks.Settings.AutoSave {
+			if err := store.SaveTasks(tasks); err != nil {
+				return nil, fmt.Errorf("failed to auto-save dummy tasks: %w", err)
+			}
+		}
+	}
+
 	return &App{Tasks: tasks}, nil
 }
 

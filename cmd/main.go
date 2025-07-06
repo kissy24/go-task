@@ -118,22 +118,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "e": // Edit task
-			if m.currentView == "main" && len(m.selected) == 1 {
-				for id := range m.selected {
-					t, err := m.app.GetTaskByID(id)
-					if err != nil {
-						m.err = err
-						return m, nil
-					}
-					m.titleInput.SetValue(t.Title)
-					m.descriptionInput.SetValue(t.Description)
-					m.priorityInput.SetValue(string(t.Priority))
-					m.tagsInput.SetValue(strings.Join(t.Tags, ","))
-					m.currentView = "edit"
-					m.focusIndex = 0
-					m.titleInput.Focus()
-					return m, nil
-				}
+			if m.currentView == "main" && len(m.tasks) > 0 { // カーソルがタスクを指している場合
+				t := m.tasks[m.cursor]
+				m.titleInput.SetValue(t.Title)
+				m.descriptionInput.SetValue(t.Description)
+				m.priorityInput.SetValue(string(t.Priority))
+				m.tagsInput.SetValue(strings.Join(t.Tags, ","))
+				m.currentView = "edit"
+				m.focusIndex = 0
+				m.titleInput.Focus()
+				return m, nil
 			}
 
 		case "esc":
@@ -153,7 +147,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "up", "shift+tab":
-			if m.currentView == "add" {
+			if m.currentView == "add" || m.currentView == "edit" { // editビューも追加
 				m.focusIndex--
 				// Wrap around
 				if m.focusIndex < 0 {
@@ -167,7 +161,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "tab":
-			if m.currentView == "add" {
+			if m.currentView == "add" || m.currentView == "edit" { // editビューも追加
 				m.focusIndex++
 				// Wrap around
 				if m.focusIndex > 3 {
@@ -209,14 +203,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, tea.Batch(cmds...)
 			} else if m.currentView == "edit" {
-				if len(m.selected) != 1 {
-					m.err = fmt.Errorf("Please select exactly one task to edit")
-					return m, nil
-				}
-				var taskID string
-				for id := range m.selected {
-					taskID = id
-				}
+				// if len(m.selected) != 1 { // 選択状態は不要になったためコメントアウト
+				// 	m.err = fmt.Errorf("Please select exactly one task to edit")
+				// 	return m, nil
+				// }
+				taskID := m.tasks[m.cursor].ID // カーソルが指しているタスクのIDを使用
 
 				title := m.titleInput.Value()
 				description := m.descriptionInput.Value()
@@ -232,8 +223,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.err = err
 				} else {
 					m.currentView = "main"
-					m.tasks = m.app.GetAllTasks()          // Refresh tasks
-					m.selected = make(map[string]struct{}) // Clear selection
+					m.tasks = m.app.GetAllTasks() // Refresh tasks
+					// m.selected = make(map[string]struct{}) // 選択状態をクリアしない
 					// Clear form fields
 					m.titleInput.SetValue("")
 					m.descriptionInput.SetValue("")
@@ -343,7 +334,7 @@ func (m model) View() string {
 
 		total, completed, incomplete := m.app.GetTaskStats()
 		s += fmt.Sprintf("\nTotal: %d | Incomplete: %d | Completed: %d\n\n", total, incomplete, completed)
-		s += "[a]dd [e]dit [d]elete [v]iew [f]ilter [q]uit [h]elp\n"
+		s += "[a]dd [e]dit [d]elete [v]iew [f]ilter [q]uit [h]elp\n" // (select one) を削除
 		return s
 
 	case "add":
