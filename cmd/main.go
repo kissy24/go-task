@@ -100,8 +100,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+		case "e": // Edit task
+			if m.currentView == "main" && len(m.selected) == 1 {
+				for id := range m.selected {
+					t, err := m.app.GetTaskByID(id)
+					if err != nil {
+						m.err = err
+						return m, nil
+					}
+					m.titleInput.SetValue(t.Title)
+					m.descriptionInput.SetValue(t.Description)
+					m.priorityInput.SetValue(string(t.Priority))
+					m.tagsInput.SetValue(strings.Join(t.Tags, ","))
+					m.currentView = "edit"
+					m.focusIndex = 0
+					m.titleInput.Focus()
+					return m, nil
+				}
+			}
+
 		case "esc":
-			if m.currentView == "add" {
+			if m.currentView == "add" || m.currentView == "edit" {
 				m.currentView = "main"
 				// Clear form fields
 				m.titleInput.SetValue("")
@@ -112,6 +131,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.descriptionInput.Blur()
 				m.priorityInput.Blur()
 				m.tagsInput.Blur()
+				m.selected = make(map[string]struct{}) // Clear selection
 				return m, nil
 			}
 
@@ -171,6 +191,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.tagsInput.Blur()
 				}
 				return m, tea.Batch(cmds...)
+			} else if m.currentView == "edit" {
+				if len(m.selected) != 1 {
+					m.err = fmt.Errorf("Please select exactly one task to edit")
+					return m, nil
+				}
+				var taskID string
+				for id := range m.selected {
+					taskID = id
+				}
+
+				title := m.titleInput.Value()
+				description := m.descriptionInput.Value()
+				priority := task.Priority(strings.ToUpper(m.priorityInput.Value()))
+				tagsStr := m.tagsInput.Value()
+				var tags []string
+				if tagsStr != "" {
+					tags = strings.Split(tagsStr, ",")
+				}
+
+				_, err := m.app.UpdateTask(taskID, title, description, "", priority, tags) // Status is not edited here
+				if err != nil {
+					m.err = err
+				} else {
+					m.currentView = "main"
+					m.tasks = m.app.GetAllTasks()          // Refresh tasks
+					m.selected = make(map[string]struct{}) // Clear selection
+					// Clear form fields
+					m.titleInput.SetValue("")
+					m.descriptionInput.SetValue("")
+					m.priorityInput.SetValue("")
+					m.tagsInput.SetValue("")
+					m.titleInput.Blur()
+					m.descriptionInput.Blur()
+					m.priorityInput.Blur()
+					m.tagsInput.Blur()
+				}
+				return m, tea.Batch(cmds...)
 			} else if m.currentView == "main" {
 				if len(m.tasks) > 0 {
 					taskID := m.tasks[m.cursor].ID
@@ -198,7 +255,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Handle text input updates
-	if m.currentView == "add" {
+	if m.currentView == "add" || m.currentView == "edit" {
 		switch m.focusIndex {
 		case 0:
 			m.titleInput, cmd = m.titleInput.Update(msg)
@@ -275,6 +332,15 @@ func (m model) View() string {
 			m.priorityInput.View(),
 			m.tagsInput.View(),
 			"[enter] to submit, [esc] to cancel",
+		)
+	case "edit":
+		return fmt.Sprintf(
+			"Edit Task\n\n%s\n%s\n%s\n%s\n\n%s",
+			m.titleInput.View(),
+			m.descriptionInput.View(),
+			m.priorityInput.View(),
+			m.tagsInput.View(),
+			"[enter] to save, [esc] to cancel",
 		)
 	}
 
