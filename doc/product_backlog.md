@@ -210,19 +210,19 @@
 **So that** 対話的なCLI UIを構築できる  
 **受け入れ条件**:
 
-- [ ] Bubble Tea が正常に動作する
-- [ ] 基本的なModel-View-Update構造が実装されている
-- [ ] キーボード入力の処理が可能
+- [x] Bubble Tea が正常に動作する
+- [x] 基本的なModel-View-Update構造が実装されている
+- [x] キーボード入力の処理が可能
 
-**見積もり**: 5 Story Points  
-**ラベル**: `enhancement`, `frontend`, `sprint-2`  
+**見積もり**: 5 Story Points
+**ラベル**: `enhancement`, `frontend`, `sprint-2`
 **Tasks**:
 
-- [ ] Bubble Tea依存関係の追加
-- [ ] 基本的なMVU構造の実装
-- [ ] キーボードハンドラーの実装
-- [ ] 基本的なビューの実装
-- [ ] 統合テストの作成
+- [x] Bubble Tea依存関係の追加
+- [x] 基本的なMVU構造の実装
+- [x] キーボードハンドラーの実装
+- [x] 基本的なビューの実装
+- [x] 統合テストの作成
 
 ---
 
