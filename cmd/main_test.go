@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
-	"os" // osパッケージを追加
 	"zan/internal/app"
 	"zan/internal/store"
 	"zan/internal/task"
@@ -81,6 +81,99 @@ func TestUpdate(t *testing.T) {
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd == nil {
 		t.Errorf("Expected a quit command")
+	}
+}
+
+func TestAddTask(t *testing.T) {
+	m := initialModel()
+
+	// Go to add view
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m = updatedModel.(model)
+	if m.currentView != "add" {
+		t.Fatalf("Expected view to be 'add', got %s", m.currentView)
+	}
+
+	// Type title
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("New Task Title")})
+	m = updatedModel.(model)
+	if m.titleInput.Value() != "New Task Title" {
+		t.Errorf("Expected title input to be 'New Task Title', got %s", m.titleInput.Value())
+	}
+
+	// Move to next field (description)
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updatedModel.(model)
+	if m.focusIndex != 1 {
+		t.Errorf("Expected focusIndex to be 1, got %d", m.focusIndex)
+	}
+
+	// Type description
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("Task Description")})
+	m = updatedModel.(model)
+	if m.descriptionInput.Value() != "Task Description" {
+		t.Errorf("Expected description input to be 'Task Description', got %s", m.descriptionInput.Value())
+	}
+
+	// Move to next field (priority)
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updatedModel.(model)
+	if m.focusIndex != 2 {
+		t.Errorf("Expected focusIndex to be 2, got %d", m.focusIndex)
+	}
+
+	// Type priority
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("high")})
+	m = updatedModel.(model)
+	if m.priorityInput.Value() != "high" {
+		t.Errorf("Expected priority input to be 'high', got %s", m.priorityInput.Value())
+	}
+
+	// Move to next field (tags)
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updatedModel.(model)
+	if m.focusIndex != 3 {
+		t.Errorf("Expected focusIndex to be 3, got %d", m.focusIndex)
+	}
+
+	// Type tags
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("dev,urgent")})
+	m = updatedModel.(model)
+	if m.tagsInput.Value() != "dev,urgent" {
+		t.Errorf("Expected tags input to be 'dev,urgent', got %s", m.tagsInput.Value())
+	}
+
+	// Submit form
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updatedModel.(model)
+
+	if m.currentView != "main" {
+		t.Errorf("Expected view to be 'main' after submission, got %s", m.currentView)
+	}
+	if len(m.tasks) != 1 {
+		t.Errorf("Expected 1 task after submission, got %d", len(m.tasks))
+	}
+	if m.tasks[0].Title != "New Task Title" {
+		t.Errorf("Expected new task title to be 'New Task Title', got %s", m.tasks[0].Title)
+	}
+	if m.tasks[0].Description != "Task Description" {
+		t.Errorf("Expected new task description to be 'Task Description', got %s", m.tasks[0].Description)
+	}
+	if m.tasks[0].Priority != task.PriorityHigh {
+		t.Errorf("Expected new task priority to be 'HIGH', got %s", m.tasks[0].Priority)
+	}
+	if !strings.Contains(m.tasks[0].Tags[0], "dev") || !strings.Contains(m.tasks[0].Tags[1], "urgent") {
+		t.Errorf("Expected new task tags to be 'dev,urgent', got %v", m.tasks[0].Tags)
+	}
+
+	// Test canceling add task
+	m = initialModel()
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m = updatedModel.(model)
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m = updatedModel.(model)
+	if m.currentView != "main" {
+		t.Errorf("Expected view to be 'main' after cancel, got %s", m.currentView)
 	}
 }
 
