@@ -13,6 +13,23 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+var (
+	// 優先度に応じた色
+	priorityColors = map[task.Priority]lipgloss.Color{
+		task.PriorityHigh:   lipgloss.Color("9"),  // Red
+		task.PriorityMedium: lipgloss.Color("11"), // Yellow
+		task.PriorityLow:    lipgloss.Color("10"), // Green
+	}
+
+	// 状態に応じたアイコン
+	statusIcons = map[task.Status]string{
+		task.StatusTODO:       "●",
+		task.StatusInProgress: "◐",
+		task.StatusDone:       "✓",
+		task.StatusPending:    "⏸",
+	}
+)
+
 type model struct {
 	app         *app.App
 	tasks       []task.Task
@@ -280,13 +297,13 @@ func (m *model) setFocus() tea.Cmd {
 		if i == m.focusIndex {
 			// Set focused state
 			cmds[i] = inputs[i].Focus()
-			inputs[i].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205")) // lipglossのスタイル設定を削除
-			inputs[i].TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))   // lipglossのスタイル設定を削除
+			inputs[i].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+			inputs[i].TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 		} else {
 			// Remove focused state
 			inputs[i].Blur()
-			inputs[i].PromptStyle = lipgloss.NewStyle() // lipglossのスタイル設定を削除
-			inputs[i].TextStyle = lipgloss.NewStyle()   // lipglossのスタイル設定を削除
+			inputs[i].PromptStyle = lipgloss.NewStyle()
+			inputs[i].TextStyle = lipgloss.NewStyle()
 		}
 	}
 	return tea.Batch(cmds...)
@@ -310,12 +327,17 @@ func (m model) View() string {
 					cursor = ">"
 				}
 
-				checked := " "
+				// checked := " " // 未使用のためコメントアウト
 				if _, ok := m.selected[t.ID]; ok {
-					checked = "x"
+					// checked = "x" // 未使用のためコメントアウト
 				}
 
-				s += fmt.Sprintf("%s [%s] %s [%s]\n", cursor, checked, t.Title, t.Priority)
+				// 色とアイコンを適用
+				statusIcon := statusIcons[t.Status]
+				priorityColor := priorityColors[t.Priority]
+				styledTitle := lipgloss.NewStyle().Foreground(priorityColor).Render(t.Title)
+
+				s += fmt.Sprintf("%s %s %s %s\n", cursor, statusIcon, styledTitle, lipgloss.NewStyle().Foreground(priorityColor).Render(string(t.Priority)))
 			}
 		}
 

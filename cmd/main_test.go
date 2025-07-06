@@ -194,17 +194,17 @@ func TestView(t *testing.T) {
 	}
 
 	view := m.View()
-	// Expected output will depend on generated UUIDs, so we'll check for key elements
+	// Expected output will depend on generated UUIDs and colors, so we'll check for key elements
 	if !strings.Contains(view, "GoTask CLI v1.0.0") {
 		t.Errorf("View missing header")
 	}
-	if !strings.Contains(view, "Test Task A [HIGH]") {
+	if !strings.Contains(view, "Test Task A") { // 色コードは含まない
 		t.Errorf("View missing Test Task A")
 	}
-	if !strings.Contains(view, "Test Task B [MEDIUM]") {
+	if !strings.Contains(view, "Test Task B") { // 色コードは含まない
 		t.Errorf("View missing Test Task B")
 	}
-	if !strings.Contains(view, "Test Task C [LOW]") {
+	if !strings.Contains(view, "Test Task C") { // 色コードは含まない
 		t.Errorf("View missing Test Task C")
 	}
 	expectedStats := fmt.Sprintf("Total: %d | Incomplete: %d | Completed: %d", 3, 3, 0)
