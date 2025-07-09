@@ -3,6 +3,8 @@ package app
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"zan/internal/store"
@@ -23,8 +25,8 @@ func NewApp() (*App, error) {
 		return nil, fmt.Errorf("failed to load tasks: %w", err)
 	}
 
-	// If no tasks are loaded, add some dummy data for demonstration
-	if len(tasks.Tasks) == 0 {
+	// If no tasks are loaded and not in test environment, add some dummy data for demonstration
+	if len(tasks.Tasks) == 0 && os.Getenv("ZAN_TEST_ENV") != "true" {
 		now := time.Now()
 		tasks.Tasks = []task.Task{
 			{
@@ -187,4 +189,69 @@ func (a *App) GetTaskStats() (total, completed, incomplete int) {
 		}
 	}
 	return
+}
+
+// GetFilteredTasksByStatus は指定されたステータスでタスクをフィルタリングして返します。
+func (a *App) GetFilteredTasksByStatus(statuses []task.Status) []task.Task {
+	if len(statuses) == 0 {
+		return a.Tasks.Tasks
+	}
+
+	var filteredTasks []task.Task
+	statusMap := make(map[task.Status]bool)
+	for _, s := range statuses {
+		statusMap[s] = true
+	}
+
+	for _, t := range a.Tasks.Tasks {
+		if statusMap[t.Status] {
+			filteredTasks = append(filteredTasks, t)
+		}
+	}
+	return filteredTasks
+}
+
+// GetFilteredTasksByTags は指定されたタグでタスクをフィルタリングして返します。
+// 複数のタグが指定された場合、それら全てのタグを持つタスクを返します (AND検索)。
+func (a *App) GetFilteredTasksByTags(tags []string) []task.Task {
+	if len(tags) == 0 {
+		return a.Tasks.Tasks
+	}
+
+	var filteredTasks []task.Task
+	for _, t := range a.Tasks.Tasks {
+		matchCount := 0
+		for _, filterTag := range tags {
+			for _, taskTag := range t.Tags {
+				if strings.EqualFold(strings.TrimSpace(filterTag), strings.TrimSpace(taskTag)) {
+					matchCount++
+					break
+				}
+			}
+		}
+		if matchCount == len(tags) {
+			filteredTasks = append(filteredTasks, t)
+		}
+	}
+	return filteredTasks
+}
+
+// GetFilteredTasksByPriority は指定された優先度でタスクをフィルタリングして返します。
+func (a *App) GetFilteredTasksByPriority(priorities []task.Priority) []task.Task {
+	if len(priorities) == 0 {
+		return a.Tasks.Tasks
+	}
+
+	var filteredTasks []task.Task
+	priorityMap := make(map[task.Priority]bool)
+	for _, p := range priorities {
+		priorityMap[p] = true
+	}
+
+	for _, t := range a.Tasks.Tasks {
+		if priorityMap[t.Priority] {
+			filteredTasks = append(filteredTasks, t)
+		}
+	}
+	return filteredTasks
 }

@@ -38,6 +38,14 @@ type model struct {
 	currentView string
 	err         error
 
+	// Filter fields
+	filterStatusInput textinput.Model
+	filteredStatuses  map[task.Status]struct{}
+	isFiltering       bool
+
+	filterPriorityInput textinput.Model
+	filteredPriorities  map[task.Priority]struct{}
+
 	// Add task form fields
 	titleInput       textinput.Model
 	descriptionInput textinput.Model
@@ -73,16 +81,46 @@ func initialModel() model {
 	tai.CharLimit = 100
 	tai.Width = 50
 
+	fsi := textinput.New()
+	fsi.Placeholder = "Filter by status (e.g., TODO,IN_PROGRESS)"
+	fsi.CharLimit = 50
+	fsi.Width = 50
+
 	return model{
-		app:              a,
-		tasks:            a.GetAllTasks(),
-		selected:         make(map[string]struct{}),
-		currentView:      "main", // "main", "add", "edit", "detail"
-		titleInput:       ti,
-		descriptionInput: di,
-		priorityInput:    pi,
-		tagsInput:        tai,
-		focusIndex:       0,
+		app:               a,
+		tasks:             a.GetAllTasks(),
+		selected:          make(map[string]struct{}),
+		currentView:       "main", // "main", "add", "edit", "detail", "filter"
+		titleInput:        ti,
+		descriptionInput:  di,
+		priorityInput:     pi,
+		tagsInput:         tai,
+		focusIndex:        0,
+		filterStatusInput: fsi,
+		filteredStatuses:  make(map[task.Status]struct{}),
+		isFiltering:       false,
+	}
+
+	fpi := textinput.New()
+	fpi.Placeholder = "Filter by priority (e.g., HIGH,MEDIUM)"
+	fpi.CharLimit = 50
+	fpi.Width = 50
+
+	return model{
+		app:                 a,
+		tasks:               a.GetAllTasks(),
+		selected:            make(map[string]struct{}),
+		currentView:         "main", // "main", "add", "edit", "detail", "filter", "filter_priority"
+		titleInput:          ti,
+		descriptionInput:    di,
+		priorityInput:       pi,
+		tagsInput:           tai,
+		focusIndex:          0,
+		filterStatusInput:   fsi,
+		filteredStatuses:    make(map[task.Status]struct{}),
+		isFiltering:         false,
+		filterPriorityInput: fpi,
+		filteredPriorities:  make(map[task.Priority]struct{}),
 	}
 }
 
@@ -130,8 +168,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+		case "f": // Filter tasks
+			if m.currentView == "main" {
+				m.currentView = "filter"
+				m.filterStatusInput.Focus()
+				return m, nil
+			}
+
+		case "p": // Filter by priority
+			if m.currentView == "main" {
+				m.currentView = "filter_priority"
+				m.filterPriorityInput.Focus()
+				return m, nil
+			}
+
 		case "esc":
-			if m.currentView == "add" || m.currentView == "edit" {
+			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" {
 				m.currentView = "main"
 				// Clear form fields
 				m.titleInput.SetValue("")
@@ -142,6 +194,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.descriptionInput.Blur()
 				m.priorityInput.Blur()
 				m.tagsInput.Blur()
+				m.filterStatusInput.SetValue("") // Clear status filter input
+				m.filterStatusInput.Blur()
+				m.filteredStatuses = make(map[task.Status]struct{}) // Clear filtered statuses
+				m.filterPriorityInput.SetValue("")                  // Clear priority filter input
+				m.filterPriorityInput.Blur()
+				m.filteredPriorities = make(map[task.Priority]struct{}) // Clear filtered priorities
+				m.isFiltering = false
+				m.tasks = m.app.GetAllTasks()          // Reset tasks to all tasks
 				m.selected = make(map[string]struct{}) // Clear selection
 				return m, nil
 			}
@@ -236,6 +296,42 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.tagsInput.Blur()
 				}
 				return m, tea.Batch(cmds...)
+			} else if m.currentView == "filter" {
+				statusStr := m.filterStatusInput.Value()
+				if statusStr != "" {
+					statuses := strings.Split(strings.ToUpper(statusStr), ",")
+					m.filteredStatuses = make(map[task.Status]struct{})
+					for _, s := range statuses {
+						m.filteredStatuses[task.Status(strings.TrimSpace(s))] = struct{}{}
+					}
+					m.isFiltering = true
+					m.tasks = m.app.GetFilteredTasksByStatus(m.convertStatusMapToList())
+				} else {
+					m.isFiltering = false
+					m.tasks = m.app.GetAllTasks()
+				}
+				m.currentView = "main"
+				m.filterStatusInput.SetValue("")
+				m.filterStatusInput.Blur()
+				return m, tea.Batch(cmds...)
+			} else if m.currentView == "filter_priority" {
+				priorityStr := m.filterPriorityInput.Value()
+				if priorityStr != "" {
+					priorities := strings.Split(strings.ToUpper(priorityStr), ",")
+					m.filteredPriorities = make(map[task.Priority]struct{})
+					for _, p := range priorities {
+						m.filteredPriorities[task.Priority(strings.TrimSpace(p))] = struct{}{}
+					}
+					m.isFiltering = true
+					m.tasks = m.app.GetFilteredTasksByPriority(m.convertPriorityMapToList())
+				} else {
+					m.isFiltering = false
+					m.tasks = m.app.GetAllTasks()
+				}
+				m.currentView = "main"
+				m.filterPriorityInput.SetValue("")
+				m.filterPriorityInput.Blur()
+				return m, tea.Batch(cmds...)
 			} else if m.currentView == "main" {
 				if len(m.tasks) > 0 {
 					taskID := m.tasks[m.cursor].ID
@@ -275,6 +371,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tagsInput, cmd = m.tagsInput.Update(msg)
 		}
 		cmds = append(cmds, cmd)
+	} else if m.currentView == "filter" {
+		m.filterStatusInput, cmd = m.filterStatusInput.Update(msg)
+		cmds = append(cmds, cmd)
+	} else if m.currentView == "filter_priority" {
+		m.filterPriorityInput, cmd = m.filterPriorityInput.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	// Return the updated model to the Bubble Tea runtime for processing.
@@ -300,6 +402,24 @@ func (m *model) setFocus() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// convertStatusMapToList はmap[task.Status]struct{}を[]task.Statusに変換します。
+func (m model) convertStatusMapToList() []task.Status {
+	var statuses []task.Status
+	for s := range m.filteredStatuses {
+		statuses = append(statuses, s)
+	}
+	return statuses
+}
+
+// convertPriorityMapToList はmap[task.Priority]struct{}を[]task.Priorityに変換します。
+func (m model) convertPriorityMapToList() []task.Priority {
+	var priorities []task.Priority
+	for p := range m.filteredPriorities {
+		priorities = append(priorities, p)
+	}
+	return priorities
+}
+
 func (m model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %v\nPress q to quit.", m.err)
@@ -308,6 +428,14 @@ func (m model) View() string {
 	switch m.currentView {
 	case "main":
 		s := "GoTask CLI v1.0.0\n\n"
+
+		if m.isFiltering {
+			filterConditions := []string{}
+			for status := range m.filteredStatuses {
+				filterConditions = append(filterConditions, string(status))
+			}
+			s += fmt.Sprintf("Filtered by Status: %s\n\n", strings.Join(filterConditions, ", "))
+		}
 
 		if len(m.tasks) == 0 {
 			s += "No tasks found. Press 'a' to add a new task.\n\n"
@@ -334,7 +462,7 @@ func (m model) View() string {
 
 		total, completed, incomplete := m.app.GetTaskStats()
 		s += fmt.Sprintf("\nTotal: %d | Incomplete: %d | Completed: %d\n\n", total, incomplete, completed)
-		s += "[a]dd [e]dit [d]elete [v]iew [f]ilter [q]uit [h]elp\n" // (select one) を削除
+		s += "[a]dd [e]dit [d]elete [v]iew [f]ilter [p]riority filter [q]uit [h]elp\n" // (select one) を削除
 		return s
 
 	case "add":
@@ -354,6 +482,18 @@ func (m model) View() string {
 			m.priorityInput.View(),
 			m.tagsInput.View(),
 			"[enter] to save, [esc] to cancel",
+		)
+	case "filter":
+		return fmt.Sprintf(
+			"Filter Tasks by Status (e.g., TODO,IN_PROGRESS)\n\n%s\n\n%s",
+			m.filterStatusInput.View(),
+			"[enter] to apply filter, [esc] to cancel",
+		)
+	case "filter_priority":
+		return fmt.Sprintf(
+			"Filter Tasks by Priority (e.g., HIGH,MEDIUM)\n\n%s\n\n%s",
+			m.filterPriorityInput.View(),
+			"[enter] to apply filter, [esc] to cancel",
 		)
 	}
 
