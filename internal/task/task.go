@@ -3,6 +3,7 @@ package task
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -75,4 +76,28 @@ func (t *Task) Validate() error {
 		return fmt.Errorf("Invalid task priority: %s", t.Priority)
 	}
 	return nil
+}
+
+// SearchTasks はキーワードに基づいてタスクを検索します。
+// タイトルと詳細説明に対して大文字小文字を区別しない部分一致検索を行います。
+func SearchTasks(tasks []Task, keyword string) []Task {
+	if keyword == "" {
+		return tasks
+	}
+
+	var foundTasks []Task
+	lowerKeyword := strings.ToLower(keyword)
+
+	for _, t := range tasks {
+		lowerTitle := strings.ToLower(t.Title)
+		lowerDescription := strings.ToLower(t.Description)
+		// デバッグログ
+		// fmt.Printf("Comparing: Title='%s' (lower='%s'), Desc='%s' (lower='%s'), Keyword='%s'\n",
+		// 	t.Title, lowerTitle, t.Description, lowerDescription, lowerKeyword)
+		if strings.Contains(lowerTitle, lowerKeyword) ||
+			strings.Contains(lowerDescription, lowerKeyword) {
+			foundTasks = append(foundTasks, t)
+		}
+	}
+	return foundTasks
 }

@@ -192,6 +192,11 @@ func (a *App) GetTaskStats() (total, completed, incomplete int) {
 	return
 }
 
+// Search はキーワードに基づいてタスクを検索します。
+func (a *App) Search(keyword string) []task.Task {
+	return task.SearchTasks(a.Tasks.Tasks, keyword)
+}
+
 // GetFilteredTasksByStatus は指定されたステータスでタスクをフィルタリングして返します。
 func (a *App) GetFilteredTasksByStatus(statuses []task.Status) []task.Task {
 	if len(statuses) == 0 {

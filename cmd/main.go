@@ -49,6 +49,13 @@ type model struct {
 	filterTagsInput textinput.Model
 	filteredTags    map[string]struct{}
 
+	searchInput   textinput.Model // Search input field
+	searchKeyword string          // Current search keyword
+
+	sortInput textinput.Model // Sort input field
+	sortBy    string          // Current sort by field
+	sortAsc   bool            // Current sort order (ascending/descending)
+
 	// Add task form fields
 	titleInput       textinput.Model
 	descriptionInput textinput.Model
@@ -89,21 +96,6 @@ func initialModel() model {
 	fsi.CharLimit = 50
 	fsi.Width = 50
 
-	return model{
-		app:               a,
-		tasks:             a.GetAllTasks(),
-		selected:          make(map[string]struct{}),
-		currentView:       "main", // "main", "add", "edit", "detail", "filter"
-		titleInput:        ti,
-		descriptionInput:  di,
-		priorityInput:     pi,
-		tagsInput:         tai,
-		focusIndex:        0,
-		filterStatusInput: fsi,
-		filteredStatuses:  make(map[task.Status]struct{}),
-		isFiltering:       false,
-	}
-
 	fpi := textinput.New()
 	fpi.Placeholder = "Filter by priority (e.g., HIGH,MEDIUM)"
 	fpi.CharLimit = 50
@@ -114,11 +106,21 @@ func initialModel() model {
 	fti.CharLimit = 100
 	fti.Width = 50
 
+	si := textinput.New()
+	si.Placeholder = "Search keyword (title or description)"
+	si.CharLimit = 255
+	si.Width = 50
+
+	sortInput := textinput.New()
+	sortInput.Placeholder = "Sort by: created_at, updated_at, priority (e.g., created_at asc)"
+	sortInput.CharLimit = 50
+	sortInput.Width = 50
+
 	return model{
 		app:                 a,
 		tasks:               a.GetAllTasks(),
 		selected:            make(map[string]struct{}),
-		currentView:         "main", // "main", "add", "edit", "detail", "filter", "filter_priority", "filter_tags"
+		currentView:         "main", // "main", "add", "edit", "detail", "filter", "filter_priority", "filter_tags", "search", "sort"
 		titleInput:          ti,
 		descriptionInput:    di,
 		priorityInput:       pi,
@@ -131,6 +133,10 @@ func initialModel() model {
 		filteredPriorities:  make(map[task.Priority]struct{}),
 		filterTagsInput:     fti,
 		filteredTags:        make(map[string]struct{}),
+		searchInput:         si,
+		sortInput:           sortInput,
+		sortBy:              "created_at", // Default sort by created_at
+		sortAsc:             false,        // Default sort descending
 	}
 }
 
@@ -162,6 +168,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentView = "add"
 				m.titleInput.Focus()
 				m.focusIndex = 0
+				return m, nil
+			}
+
+		case "o": // Sort tasks
+			if m.currentView == "main" {
+				m.currentView = "sort"
+				m.sortInput.Focus()
 				return m, nil
 			}
 
@@ -199,8 +212,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+		case "s": // Search tasks
+			if m.currentView == "main" {
+				m.currentView = "search"
+				m.searchInput.Focus()
+				return m, nil
+			}
+
 		case "esc":
-			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" || m.currentView == "filter_tags" {
+			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" || m.currentView == "filter_tags" || m.currentView == "search" || m.currentView == "sort" {
 				m.currentView = "main"
 				// Clear form fields
 				m.titleInput.SetValue("")
@@ -220,6 +240,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.filterTagsInput.SetValue("")                          // Clear tags filter input
 				m.filterTagsInput.Blur()
 				m.filteredTags = make(map[string]struct{}) // Clear filtered tags
+				m.searchInput.SetValue("")                 // Clear search input
+				m.searchInput.Blur()
+				m.searchKeyword = ""
+				m.sortInput.SetValue("") // Clear sort input
+				m.sortInput.Blur()
+				m.sortBy = "created_at" // Reset sort by
+				m.sortAsc = false       // Reset sort order
 				m.isFiltering = false
 				m.tasks = m.app.GetAllTasks()          // Reset tasks to all tasks
 				m.selected = make(map[string]struct{}) // Clear selection
@@ -370,6 +397,42 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.filterTagsInput.SetValue("")
 				m.filterTagsInput.Blur()
 				return m, tea.Batch(cmds...)
+			} else if m.currentView == "search" {
+				m.searchKeyword = m.searchInput.Value()
+				if m.searchKeyword != "" {
+					m.isFiltering = true
+					m.tasks = m.app.Search(m.searchKeyword)
+				} else {
+					m.isFiltering = false
+					m.tasks = m.app.GetAllTasks()
+				}
+				m.currentView = "main"
+				m.searchInput.SetValue("")
+				m.searchInput.Blur()
+				return m, tea.Batch(cmds...)
+			} else if m.currentView == "sort" {
+				sortStr := m.sortInput.Value()
+				if sortStr != "" {
+					parts := strings.Fields(sortStr)
+					if len(parts) > 0 {
+						m.sortBy = parts[0]
+						if len(parts) > 1 && strings.ToLower(parts[1]) == "asc" {
+							m.sortAsc = true
+						} else {
+							m.sortAsc = false
+						}
+					}
+					m.tasks = m.app.SortTasks(m.tasks, m.sortBy, m.sortAsc)
+				} else {
+					// Clear sort if input is empty
+					m.sortBy = "created_at"
+					m.sortAsc = false
+					m.tasks = m.app.SortTasks(m.app.GetAllTasks(), m.sortBy, m.sortAsc) // Reset to default sort
+				}
+				m.currentView = "main"
+				m.sortInput.SetValue("")
+				m.sortInput.Blur()
+				return m, tea.Batch(cmds...)
 			} else if m.currentView == "main" {
 				if len(m.tasks) > 0 {
 					taskID := m.tasks[m.cursor].ID
@@ -417,6 +480,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	} else if m.currentView == "filter_tags" {
 		m.filterTagsInput, cmd = m.filterTagsInput.Update(msg)
+		cmds = append(cmds, cmd)
+	} else if m.currentView == "search" {
+		m.searchInput, cmd = m.searchInput.Update(msg)
+		cmds = append(cmds, cmd)
+	} else if m.currentView == "sort" {
+		m.sortInput, cmd = m.sortInput.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -481,10 +550,34 @@ func (m model) View() string {
 
 		if m.isFiltering {
 			filterConditions := []string{}
-			for status := range m.filteredStatuses {
-				filterConditions = append(filterConditions, string(status))
+			if len(m.filteredStatuses) > 0 {
+				statuses := []string{}
+				for status := range m.filteredStatuses {
+					statuses = append(statuses, string(status))
+				}
+				filterConditions = append(filterConditions, fmt.Sprintf("Status: %s", strings.Join(statuses, ", ")))
 			}
-			s += fmt.Sprintf("Filtered by Status: %s\n\n", strings.Join(filterConditions, ", "))
+			if len(m.filteredPriorities) > 0 {
+				priorities := []string{}
+				for priority := range m.filteredPriorities {
+					priorities = append(priorities, string(priority))
+				}
+				filterConditions = append(filterConditions, fmt.Sprintf("Priority: %s", strings.Join(priorities, ", ")))
+			}
+			if len(m.filteredTags) > 0 {
+				tags := []string{}
+				for tag := range m.filteredTags {
+					tags = append(tags, tag)
+				}
+				filterConditions = append(filterConditions, fmt.Sprintf("Tags: %s", strings.Join(tags, ", ")))
+			}
+			if m.searchKeyword != "" {
+				filterConditions = append(filterConditions, fmt.Sprintf("Search: \"%s\"", m.searchKeyword))
+			}
+
+			if len(filterConditions) > 0 {
+				s += fmt.Sprintf("Active Filters: %s\n\n", strings.Join(filterConditions, "; "))
+			}
 		}
 
 		if len(m.tasks) == 0 {
@@ -504,15 +597,31 @@ func (m model) View() string {
 				// 色とアイコンを適用
 				statusIcon := statusIcons[t.Status]
 				priorityColor := priorityColors[t.Priority]
-				styledTitle := lipgloss.NewStyle().Foreground(priorityColor).Render(t.Title)
+				// 検索キーワードのハイライト
+				displayTitle := t.Title
+				displayDescription := t.Description
+				if m.searchKeyword != "" {
+					// タイトル内のキーワードをハイライト
+					displayTitle = strings.ReplaceAll(displayTitle, m.searchKeyword, lipgloss.NewStyle().Background(lipgloss.Color("205")).Render(m.searchKeyword))
+					// 説明内のキーワードをハイライト
+					displayDescription = strings.ReplaceAll(displayDescription, m.searchKeyword, lipgloss.NewStyle().Background(lipgloss.Color("205")).Render(m.searchKeyword))
+				}
+
+				styledTitle := lipgloss.NewStyle().Foreground(priorityColor).Render(displayTitle)
 
 				s += fmt.Sprintf("%s %s %s %s\n", cursor, statusIcon, styledTitle, lipgloss.NewStyle().Foreground(priorityColor).Render(string(t.Priority)))
 			}
 		}
 
 		total, completed, incomplete := m.app.GetTaskStats()
-		s += fmt.Sprintf("\nTotal: %d | Incomplete: %d | Completed: %d\n\n", total, incomplete, completed)
-		s += "[a]dd [e]dit [d]elete [v]iew [f]ilter [p]riority filter [t]ag filter [q]uit [h]elp\n"
+		s += fmt.Sprintf("\nTotal: %d | Incomplete: %d | Completed: %d\n", total, incomplete, completed)
+		s += fmt.Sprintf("Sorted by: %s %s\n\n", m.sortBy, func() string {
+			if m.sortAsc {
+				return "asc"
+			}
+			return "desc"
+		}())
+		s += "[a]dd [e]dit [d]elete [v]iew [f]ilter [p]riority filter [t]ag filter [s]earch [o]sort [q]uit [h]elp\n"
 		return s
 
 	case "add":
@@ -558,6 +667,18 @@ func (m model) View() string {
 			tagsList,
 			m.filterTagsInput.View(),
 			"[enter] to apply filter, [esc] to cancel",
+		)
+	case "search":
+		return fmt.Sprintf(
+			"Search Tasks by Keyword (Title or Description)\n\n%s\n\n%s",
+			m.searchInput.View(),
+			"[enter] to search, [esc] to cancel",
+		)
+	case "sort":
+		return fmt.Sprintf(
+			"Sort Tasks (e.g., created_at asc, priority desc)\n\n%s\n\n%s",
+			m.sortInput.View(),
+			"[enter] to apply sort, [esc] to cancel",
 		)
 	}
 

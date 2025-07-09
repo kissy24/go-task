@@ -3,6 +3,7 @@ package app
 import (
 	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -491,6 +492,97 @@ func TestGetFilteredTasksByTags(t *testing.T) {
 					if !found && len(tt.tags) > 0 {
 						t.Errorf("Task %s does not have expected tag %s for filter %v", ft.Title, filterTag, tt.tags)
 					}
+				}
+			}
+		})
+	}
+}
+
+func TestSearchTasks(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "zan_test_search_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	setupTestEnv(t, tmpDir)
+
+	app, err := NewApp()
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	// テスト用のタスクを追加
+	app.AddTask("Buy groceries", "Milk, eggs, bread", task.PriorityHigh, nil)
+	app.AddTask("Finish report", "Complete Q3 financial report", task.PriorityMedium, nil)
+	app.AddTask("Call John", "Discuss project updates", task.PriorityLow, nil)
+	app.AddTask("Prepare presentation", "Review slides for meeting", task.PriorityHigh, nil)
+	app.AddTask("Grocery shopping list", "Fruits and vegetables", task.PriorityMedium, nil)
+
+	// デバッグログ
+	for i, taskItem := range app.Tasks.Tasks { // 変数名を変更して衝突を避ける
+		t.Logf("Task %d: ID=%s, Title='%s', Description='%s'", i, taskItem.ID, taskItem.Title, taskItem.Description)
+	}
+
+	tests := []struct {
+		name     string
+		keyword  string
+		expected []string // 期待されるタスクのタイトル
+	}{
+		{
+			name:     "Search by title keyword 'report'",
+			keyword:  "report",
+			expected: []string{"Finish report"},
+		},
+		{
+			name:     "Search by description keyword 'milk'",
+			keyword:  "milk",
+			expected: []string{"Buy groceries"},
+		},
+		{
+			name:     "Case-insensitive search 'grocery'",
+			keyword:  "grocery",
+			expected: []string{"Grocery shopping list"}, // "Buy groceries"は"grocery"を含まない
+		},
+		{
+			name:     "Search by partial keyword 'proj'",
+			keyword:  "proj",
+			expected: []string{"Call John"},
+		},
+		{
+			name:     "No matching keyword",
+			keyword:  "nonexistent",
+			expected: []string{},
+		},
+		{
+			name:     "Empty keyword returns all tasks",
+			keyword:  "",
+			expected: []string{"Buy groceries", "Finish report", "Call John", "Prepare presentation", "Grocery shopping list"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			foundTasks := app.Search(tt.keyword)
+			t.Logf("Search() for keyword '%s' returned %d tasks:", tt.keyword, len(foundTasks))
+			for _, ft := range foundTasks {
+				t.Logf("  - Found Task: Title='%s'", ft.Title)
+			}
+
+			if len(foundTasks) != len(tt.expected) {
+				t.Errorf("Search() got %d tasks, want %d for keyword '%s'", len(foundTasks), len(tt.expected), tt.keyword)
+			}
+
+			foundTitles := make([]string, len(foundTasks))
+			for i, t := range foundTasks {
+				foundTitles[i] = t.Title
+			}
+			// 順序は保証されないため、ソートして比較
+			sort.Strings(foundTitles)
+			sort.Strings(tt.expected) // 期待値もソート
+
+			for i, expectedTitle := range tt.expected {
+				if foundTitles[i] != expectedTitle {
+					t.Errorf("Search() for keyword '%s', at index %d got '%s', want '%s'", tt.keyword, i, foundTitles[i], expectedTitle)
 				}
 			}
 		})
