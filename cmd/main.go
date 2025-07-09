@@ -31,12 +31,13 @@ var (
 )
 
 type model struct {
-	app         *app.App
-	tasks       []task.Task
-	cursor      int
-	selected    map[string]struct{} // selected task IDs
-	currentView string
-	err         error
+	app            *app.App
+	tasks          []task.Task
+	cursor         int
+	selected       map[string]struct{} // selected task IDs
+	currentView    string
+	err            error
+	detailViewTask *task.Task // Currently viewed task in detail view
 
 	// Filter fields
 	filterStatusInput textinput.Model
@@ -178,6 +179,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+		case "v": // View task details
+			if m.currentView == "main" && len(m.tasks) > 0 {
+				m.detailViewTask = &m.tasks[m.cursor]
+				m.currentView = "detail"
+				return m, nil
+			}
+
+		case "c": // Change task status (cycle through TODO, IN_PROGRESS, DONE, PENDING)
+			if m.currentView == "main" && len(m.tasks) > 0 {
+				taskID := m.tasks[m.cursor].ID
+				currentTask, err := m.app.GetTaskByID(taskID)
+				if err != nil {
+					m.err = err
+					return m, nil
+				}
+
+				nextStatus := currentTask.Status
+				switch currentTask.Status {
+				case task.StatusTODO:
+					nextStatus = task.StatusInProgress
+				case task.StatusInProgress:
+					nextStatus = task.StatusDone
+				case task.StatusDone:
+					nextStatus = task.StatusPending
+				case task.StatusPending:
+					nextStatus = task.StatusTODO
+				}
+
+				_, err = m.app.UpdateTask(taskID, "", "", nextStatus, "", nil)
+				if err != nil {
+					m.err = err
+				} else {
+					m.tasks = m.app.GetAllTasks() // Refresh tasks
+				}
+				return m, nil
+			}
+
 		case "e": // Edit task
 			if m.currentView == "main" && len(m.tasks) > 0 { // カーソルがタスクを指している場合
 				t := m.tasks[m.cursor]
@@ -220,7 +258,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "esc":
-			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" || m.currentView == "filter_tags" || m.currentView == "search" || m.currentView == "sort" {
+			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" || m.currentView == "filter_tags" || m.currentView == "search" || m.currentView == "sort" || m.currentView == "detail" {
 				m.currentView = "main"
 				// Clear form fields
 				m.titleInput.SetValue("")
@@ -248,6 +286,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sortBy = "created_at" // Reset sort by
 				m.sortAsc = false       // Reset sort order
 				m.isFiltering = false
+				m.detailViewTask = nil                 // Clear selected task for detail view
 				m.tasks = m.app.GetAllTasks()          // Reset tasks to all tasks
 				m.selected = make(map[string]struct{}) // Clear selection
 				return m, nil
@@ -621,7 +660,27 @@ func (m model) View() string {
 			}
 			return "desc"
 		}())
-		s += "[a]dd [e]dit [d]elete [v]iew [f]ilter [p]riority filter [t]ag filter [s]earch [o]sort [q]uit [h]elp\n"
+		s += "[a]dd [e]dit [d]elete [v]iew [c]omplete [f]ilter [p]riority filter [t]ag filter [s]earch [o]sort [q]uit [h]elp\n"
+		return s
+
+	case "detail":
+		if m.detailViewTask == nil {
+			return "Error: No task selected for detail view. Press [esc] to return to main."
+		}
+		t := m.detailViewTask
+		s := "Task Details\n\n"
+		s += fmt.Sprintf("ID: %s\n", t.ID)
+		s += fmt.Sprintf("Title: %s\n", t.Title)
+		s += fmt.Sprintf("Description: %s\n", t.Description)
+		s += fmt.Sprintf("Status: %s\n", t.Status)
+		s += fmt.Sprintf("Priority: %s\n", t.Priority)
+		s += fmt.Sprintf("Tags: %s\n", strings.Join(t.Tags, ", "))
+		s += fmt.Sprintf("Created At: %s\n", t.CreatedAt.Format("2006-01-02 15:04:05"))
+		s += fmt.Sprintf("Updated At: %s\n", t.UpdatedAt.Format("2006-01-02 15:04:05"))
+		if t.CompletedAt != nil {
+			s += fmt.Sprintf("Completed At: %s\n", t.CompletedAt.Format("2006-01-02 15:04:05"))
+		}
+		s += "\n[esc] to back\n"
 		return s
 
 	case "add":
