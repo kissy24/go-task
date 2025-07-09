@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -236,6 +237,45 @@ func (a *App) GetFilteredTasksByTags(tags []string) []task.Task {
 	return filteredTasks
 }
 
+// SortTasks は指定された基準と順序でタスクをソートします。
+func (a *App) SortTasks(tasks []task.Task, sortBy string, ascending bool) []task.Task {
+	if len(tasks) == 0 {
+		return tasks
+	}
+
+	sort.Slice(tasks, func(i, j int) bool {
+		switch sortBy {
+		case "created_at":
+			if ascending {
+				return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
+			}
+			return tasks[i].CreatedAt.After(tasks[j].CreatedAt)
+		case "updated_at":
+			if ascending {
+				return tasks[i].UpdatedAt.Before(tasks[j].UpdatedAt)
+			}
+			return tasks[i].UpdatedAt.After(tasks[j].UpdatedAt)
+		case "priority":
+			// 優先度はHIGH > MEDIUM > LOW の順
+			priorityOrder := map[task.Priority]int{
+				task.PriorityHigh:   3,
+				task.PriorityMedium: 2,
+				task.PriorityLow:    1,
+			}
+			p1 := priorityOrder[tasks[i].Priority]
+			p2 := priorityOrder[tasks[j].Priority]
+			if ascending {
+				return p1 < p2
+			}
+			return p1 > p2
+		default:
+			// デフォルトは作成日時で降順
+			return tasks[i].CreatedAt.After(tasks[j].CreatedAt)
+		}
+	})
+	return tasks
+}
+
 // GetFilteredTasksByPriority は指定された優先度でタスクをフィルタリングして返します。
 func (a *App) GetFilteredTasksByPriority(priorities []task.Priority) []task.Task {
 	if len(priorities) == 0 {
@@ -254,4 +294,21 @@ func (a *App) GetFilteredTasksByPriority(priorities []task.Priority) []task.Task
 		}
 	}
 	return filteredTasks
+}
+
+// GetAllUniqueTags は全てのタスクからユニークなタグのリストを返します。
+func (a *App) GetAllUniqueTags() []string {
+	uniqueTags := make(map[string]bool)
+	var tags []string
+	for _, t := range a.Tasks.Tasks {
+		for _, tag := range t.Tags {
+			trimmedTag := strings.TrimSpace(tag)
+			if trimmedTag != "" && !uniqueTags[trimmedTag] {
+				uniqueTags[trimmedTag] = true
+				tags = append(tags, trimmedTag)
+			}
+		}
+	}
+	sort.Strings(tags) // タグをアルファベット順にソート
+	return tags
 }

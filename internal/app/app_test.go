@@ -3,7 +3,9 @@ package app
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"zan/internal/task"
 )
@@ -407,6 +409,227 @@ func TestGetFilteredTasksByPriority(t *testing.T) {
 				}
 				if !found && len(tt.priorities) > 0 { // 空のprioritiesの場合はチェックしない
 					t.Errorf("Task %s has unexpected priority %s for filter %v", ft.Title, ft.Priority, tt.priorities)
+				}
+			}
+		})
+	}
+}
+
+func TestGetFilteredTasksByTags(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "zan_test_filter_tags_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	setupTestEnv(t, tmpDir)
+
+	app, err := NewApp()
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	// テスト用のタスクを追加
+	app.AddTask("Task with tag A", "", task.PriorityHigh, []string{"work", "urgent"})
+	app.AddTask("Task with tag B", "", task.PriorityMedium, []string{"personal"})
+	app.AddTask("Task with tag C", "", task.PriorityLow, []string{"work"})
+	app.AddTask("Task with tag D", "", task.PriorityHigh, []string{"personal", "urgent"})
+	app.AddTask("Task with no tags", "", task.PriorityMedium, []string{})
+
+	tests := []struct {
+		name     string
+		tags     []string
+		expected int
+	}{
+		{
+			name:     "Filter by single tag 'work'",
+			tags:     []string{"work"},
+			expected: 2,
+		},
+		{
+			name:     "Filter by single tag 'personal'",
+			tags:     []string{"personal"},
+			expected: 2,
+		},
+		{
+			name:     "Filter by multiple tags 'work' AND 'urgent'",
+			tags:     []string{"work", "urgent"},
+			expected: 1,
+		},
+		{
+			name:     "Filter by multiple tags 'personal' AND 'urgent'",
+			tags:     []string{"personal", "urgent"},
+			expected: 1,
+		},
+		{
+			name:     "No filter (empty tags)",
+			tags:     []string{},
+			expected: 5, // 全てのタスク
+		},
+		{
+			name:     "No matching tag",
+			tags:     []string{"nonexistent"},
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filteredTasks := app.GetFilteredTasksByTags(tt.tags)
+			if len(filteredTasks) != tt.expected {
+				t.Errorf("GetFilteredTasksByTags() got %d tasks, want %d for tags %v", len(filteredTasks), tt.expected, tt.tags)
+			}
+			// 各タスクが正しいタグを持っているか確認 (オプション)
+			for _, ft := range filteredTasks {
+				for _, filterTag := range tt.tags {
+					found := false
+					for _, taskTag := range ft.Tags {
+						if strings.EqualFold(strings.TrimSpace(filterTag), strings.TrimSpace(taskTag)) {
+							found = true
+							break
+						}
+					}
+					if !found && len(tt.tags) > 0 {
+						t.Errorf("Task %s does not have expected tag %s for filter %v", ft.Title, filterTag, tt.tags)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestGetAllUniqueTags(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "zan_test_unique_tags_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	setupTestEnv(t, tmpDir)
+
+	app, err := NewApp()
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	app.AddTask("Task 1", "", task.PriorityHigh, []string{"work", "urgent", "personal"})
+	app.AddTask("Task 2", "", task.PriorityMedium, []string{"personal", "home"})
+	app.AddTask("Task 3", "", task.PriorityLow, []string{"work"})
+	app.AddTask("Task 4", "", task.PriorityHigh, []string{"urgent"})
+	app.AddTask("Task 5", "", task.PriorityMedium, []string{}) // タグなし
+
+	expectedTags := []string{"home", "personal", "urgent", "work"}
+	actualTags := app.GetAllUniqueTags()
+
+	if len(actualTags) != len(expectedTags) {
+		t.Fatalf("GetAllUniqueTags() got %d tags, want %d", len(actualTags), len(expectedTags))
+	}
+
+	for i, tag := range actualTags {
+		if tag != expectedTags[i] {
+			t.Errorf("GetAllUniqueTags() at index %d got %s, want %s", i, tag, expectedTags[i])
+		}
+	}
+}
+
+func TestSortTasks(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "zan_test_sort_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	setupTestEnv(t, tmpDir)
+
+	app, err := NewApp()
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	// テスト用のタスクを追加 (順序が重要)
+	task1, _ := app.AddTask("Task C", "", task.PriorityLow, nil)
+	task2, _ := app.AddTask("Task A", "", task.PriorityHigh, nil)
+	task3, _ := app.AddTask("Task B", "", task.PriorityMedium, nil)
+
+	// 作成日時を調整してソート順を明確にする
+	task1.CreatedAt = task1.CreatedAt.Add(3 * time.Hour)
+	task2.CreatedAt = task2.CreatedAt.Add(1 * time.Hour)
+	task3.CreatedAt = task3.CreatedAt.Add(2 * time.Hour)
+
+	// 更新日時を調整
+	task1.UpdatedAt = task1.UpdatedAt.Add(1 * time.Hour)
+	task2.UpdatedAt = task2.UpdatedAt.Add(3 * time.Hour)
+	task3.UpdatedAt = task3.UpdatedAt.Add(2 * time.Hour)
+
+	app.Tasks.Tasks = []task.Task{*task1, *task2, *task3} // 順序をリセット
+
+	tests := []struct {
+		name      string
+		sortBy    string
+		ascending bool
+		expected  []string // 期待されるタスクのタイトル順
+	}{
+		{
+			name:      "Sort by CreatedAt Ascending",
+			sortBy:    "created_at",
+			ascending: true,
+			expected:  []string{"Task A", "Task B", "Task C"},
+		},
+		{
+			name:      "Sort by CreatedAt Descending",
+			sortBy:    "created_at",
+			ascending: false,
+			expected:  []string{"Task C", "Task B", "Task A"},
+		},
+		{
+			name:      "Sort by UpdatedAt Ascending",
+			sortBy:    "updated_at",
+			ascending: true,
+			expected:  []string{"Task C", "Task B", "Task A"},
+		},
+		{
+			name:      "Sort by UpdatedAt Descending",
+			sortBy:    "updated_at",
+			ascending: false,
+			expected:  []string{"Task A", "Task B", "Task C"},
+		},
+		{
+			name:      "Sort by Priority Ascending (Low to High)",
+			sortBy:    "priority",
+			ascending: true,
+			expected:  []string{"Task C", "Task B", "Task A"}, // Low, Medium, High
+		},
+		{
+			name:      "Sort by Priority Descending (High to Low)",
+			sortBy:    "priority",
+			ascending: false,
+			expected:  []string{"Task A", "Task B", "Task C"}, // High, Medium, Low
+		},
+		{
+			name:      "Default sort (unknown sortBy, CreatedAt Descending)",
+			sortBy:    "unknown",
+			ascending: true, // ascendingは無視され、CreatedAt Descendingになる
+			expected:  []string{"Task C", "Task B", "Task A"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// ソートは元のスライスを変更するため、毎回コピーを作成
+			tasksCopy := make([]task.Task, len(app.Tasks.Tasks))
+			copy(tasksCopy, app.Tasks.Tasks)
+
+			sortedTasks := app.SortTasks(tasksCopy, tt.sortBy, tt.ascending)
+
+			if len(sortedTasks) != len(tt.expected) {
+				t.Fatalf("SortTasks() got %d tasks, want %d", len(sortedTasks), len(tt.expected))
+			}
+
+			for i, expectedTitle := range tt.expected {
+				if sortedTasks[i].Title != expectedTitle {
+					t.Errorf("SortTasks() for %s %s, at index %d got %s, want %s", tt.sortBy, func() string {
+						if tt.ascending {
+							return "Asc"
+						}
+						return "Desc"
+					}(), i, sortedTasks[i].Title, expectedTitle)
 				}
 			}
 		})

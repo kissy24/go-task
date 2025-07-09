@@ -46,6 +46,9 @@ type model struct {
 	filterPriorityInput textinput.Model
 	filteredPriorities  map[task.Priority]struct{}
 
+	filterTagsInput textinput.Model
+	filteredTags    map[string]struct{}
+
 	// Add task form fields
 	titleInput       textinput.Model
 	descriptionInput textinput.Model
@@ -106,11 +109,16 @@ func initialModel() model {
 	fpi.CharLimit = 50
 	fpi.Width = 50
 
+	fti := textinput.New()
+	fti.Placeholder = "Filter by tags (e.g., work,personal)"
+	fti.CharLimit = 100
+	fti.Width = 50
+
 	return model{
 		app:                 a,
 		tasks:               a.GetAllTasks(),
 		selected:            make(map[string]struct{}),
-		currentView:         "main", // "main", "add", "edit", "detail", "filter", "filter_priority"
+		currentView:         "main", // "main", "add", "edit", "detail", "filter", "filter_priority", "filter_tags"
 		titleInput:          ti,
 		descriptionInput:    di,
 		priorityInput:       pi,
@@ -121,6 +129,8 @@ func initialModel() model {
 		isFiltering:         false,
 		filterPriorityInput: fpi,
 		filteredPriorities:  make(map[task.Priority]struct{}),
+		filterTagsInput:     fti,
+		filteredTags:        make(map[string]struct{}),
 	}
 }
 
@@ -182,8 +192,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+		case "t": // Filter by tags
+			if m.currentView == "main" {
+				m.currentView = "filter_tags"
+				m.filterTagsInput.Focus()
+				return m, nil
+			}
+
 		case "esc":
-			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" {
+			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" || m.currentView == "filter_tags" {
 				m.currentView = "main"
 				// Clear form fields
 				m.titleInput.SetValue("")
@@ -200,6 +217,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.filterPriorityInput.SetValue("")                  // Clear priority filter input
 				m.filterPriorityInput.Blur()
 				m.filteredPriorities = make(map[task.Priority]struct{}) // Clear filtered priorities
+				m.filterTagsInput.SetValue("")                          // Clear tags filter input
+				m.filterTagsInput.Blur()
+				m.filteredTags = make(map[string]struct{}) // Clear filtered tags
 				m.isFiltering = false
 				m.tasks = m.app.GetAllTasks()          // Reset tasks to all tasks
 				m.selected = make(map[string]struct{}) // Clear selection
@@ -332,6 +352,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.filterPriorityInput.SetValue("")
 				m.filterPriorityInput.Blur()
 				return m, tea.Batch(cmds...)
+			} else if m.currentView == "filter_tags" {
+				tagsStr := m.filterTagsInput.Value()
+				if tagsStr != "" {
+					tags := strings.Split(tagsStr, ",")
+					m.filteredTags = make(map[string]struct{})
+					for _, t := range tags {
+						m.filteredTags[strings.TrimSpace(t)] = struct{}{}
+					}
+					m.isFiltering = true
+					m.tasks = m.app.GetFilteredTasksByTags(m.convertTagMapToList())
+				} else {
+					m.isFiltering = false
+					m.tasks = m.app.GetAllTasks()
+				}
+				m.currentView = "main"
+				m.filterTagsInput.SetValue("")
+				m.filterTagsInput.Blur()
+				return m, tea.Batch(cmds...)
 			} else if m.currentView == "main" {
 				if len(m.tasks) > 0 {
 					taskID := m.tasks[m.cursor].ID
@@ -377,6 +415,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	} else if m.currentView == "filter_priority" {
 		m.filterPriorityInput, cmd = m.filterPriorityInput.Update(msg)
 		cmds = append(cmds, cmd)
+	} else if m.currentView == "filter_tags" {
+		m.filterTagsInput, cmd = m.filterTagsInput.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	// Return the updated model to the Bubble Tea runtime for processing.
@@ -418,6 +459,15 @@ func (m model) convertPriorityMapToList() []task.Priority {
 		priorities = append(priorities, p)
 	}
 	return priorities
+}
+
+// convertTagMapToList はmap[string]struct{}を[]stringに変換します。
+func (m model) convertTagMapToList() []string {
+	var tags []string
+	for t := range m.filteredTags {
+		tags = append(tags, t)
+	}
+	return tags
 }
 
 func (m model) View() string {
@@ -462,7 +512,7 @@ func (m model) View() string {
 
 		total, completed, incomplete := m.app.GetTaskStats()
 		s += fmt.Sprintf("\nTotal: %d | Incomplete: %d | Completed: %d\n\n", total, incomplete, completed)
-		s += "[a]dd [e]dit [d]elete [v]iew [f]ilter [p]riority filter [q]uit [h]elp\n" // (select one) を削除
+		s += "[a]dd [e]dit [d]elete [v]iew [f]ilter [p]riority filter [t]ag filter [q]uit [h]elp\n"
 		return s
 
 	case "add":
@@ -493,6 +543,20 @@ func (m model) View() string {
 		return fmt.Sprintf(
 			"Filter Tasks by Priority (e.g., HIGH,MEDIUM)\n\n%s\n\n%s",
 			m.filterPriorityInput.View(),
+			"[enter] to apply filter, [esc] to cancel",
+		)
+	case "filter_tags":
+		allTags := m.app.GetAllUniqueTags()
+		tagsList := ""
+		if len(allTags) > 0 {
+			tagsList = fmt.Sprintf("Available Tags: %s\n\n", strings.Join(allTags, ", "))
+		} else {
+			tagsList = "No tags available.\n\n"
+		}
+		return fmt.Sprintf(
+			"Filter Tasks by Tags (e.g., work,personal)\n\n%s%s\n\n%s",
+			tagsList,
+			m.filterTagsInput.View(),
 			"[enter] to apply filter, [esc] to cancel",
 		)
 	}
