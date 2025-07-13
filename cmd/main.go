@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/pkg/profile"
 )
 
 var (
@@ -914,6 +915,11 @@ func (m model) View() string {
 }
 
 func main() {
+	// プロファイリングを有効にするには、環境変数 GO_TASK_PROFILE を設定します。
+	if os.Getenv("GO_TASK_PROFILE") == "true" {
+		defer profile.Start(profile.MemProfile, profile.ProfilePath(".")).Stop()
+	}
+
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		log.Error("Application failed:", err)

@@ -13,7 +13,7 @@ import (
 )
 
 // setupTestEnv はテスト用の環境変数を設定し、テスト終了後に元に戻します。
-func setupTestEnv(t *testing.T, tempDir string) {
+func setupTestEnvForTest(t *testing.T, tempDir string) {
 	oldHome := os.Getenv("HOME")
 	oldTestEnv := os.Getenv("GO_TASK_TEST_ENV")
 	os.Setenv("HOME", tempDir)
@@ -30,7 +30,7 @@ func TestNewApp(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -50,7 +50,7 @@ func TestAddTask(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -101,7 +101,7 @@ func TestGetTaskByID(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -133,7 +133,7 @@ func TestUpdateTask(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -182,7 +182,7 @@ func TestDeleteTask(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -218,7 +218,7 @@ func TestGetAllTasks(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -240,7 +240,7 @@ func TestGetTaskStats(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -271,7 +271,7 @@ func TestGetFilteredTasksByStatus(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -353,7 +353,7 @@ func TestGetFilteredTasksByPriority(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -423,7 +423,7 @@ func TestGetFilteredTasksByTags(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -505,7 +505,7 @@ func TestSearchTasks(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -596,7 +596,7 @@ func TestGetAllUniqueTags(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -629,7 +629,7 @@ func TestSortTasks(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -735,7 +735,7 @@ func TestExportTasks(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -791,7 +791,7 @@ func TestImportTasks(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
@@ -920,7 +920,7 @@ func TestErrorHandling(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	setupTestEnv(t, tmpDir)
+	setupTestEnvForTest(t, tmpDir)
 
 	app, err := NewApp()
 	if err != nil {
