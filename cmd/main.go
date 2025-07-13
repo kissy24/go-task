@@ -7,6 +7,7 @@ import (
 
 	"go-task/internal/app"
 	"go-task/internal/config"
+	"go-task/internal/log"
 	"go-task/internal/task"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -37,7 +38,7 @@ type model struct {
 	cursor         int
 	selected       map[string]struct{} // selected task IDs
 	currentView    string
-	err            error
+	err            *app.AppError // Use custom error type
 	detailViewTask *task.Task     // Currently viewed task in detail view
 	cfg            *config.Config // Application configuration
 
@@ -82,12 +83,13 @@ type model struct {
 func initialModel() model {
 	a, err := app.NewApp()
 	if err != nil {
-		return model{err: err}
+		appErr, _ := err.(*app.AppError)
+		return model{err: appErr}
 	}
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		return model{err: err}
+		return model{err: app.NewAppError(app.ErrTypeInternal, "Failed to load config", err)}
 	}
 
 	ti := textinput.New()
@@ -250,7 +252,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				taskID := m.tasks[m.cursor].ID
 				currentTask, err := m.app.GetTaskByID(taskID)
 				if err != nil {
-					m.err = err
+					m.err, _ = err.(*app.AppError)
 					return m, nil
 				}
 
@@ -268,7 +270,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				_, err = m.app.UpdateTask(taskID, "", "", nextStatus, "", nil)
 				if err != nil {
-					m.err = err
+					m.err, _ = err.(*app.AppError)
 				} else {
 					m.tasks = m.app.GetAllTasks() // Refresh tasks
 				}
@@ -410,7 +412,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				_, err := m.app.AddTask(title, description, priority, tags)
 				if err != nil {
-					m.err = err
+					m.err, _ = err.(*app.AppError)
 				} else {
 					m.currentView = "main"
 					m.tasks = m.app.GetAllTasks() // Refresh tasks
@@ -443,7 +445,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				_, err := m.app.UpdateTask(taskID, title, description, "", priority, tags) // Status is not edited here
 				if err != nil {
-					m.err = err
+					m.err, _ = err.(*app.AppError)
 				} else {
 					m.currentView = "main"
 					m.tasks = m.app.GetAllTasks() // Refresh tasks
@@ -566,7 +568,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				err := m.cfg.SaveConfig()
 				if err != nil {
-					m.err = err
+					m.err = app.NewAppError(app.ErrTypeIO, "Failed to save config", err)
 				} else {
 					m.currentView = "main"
 					// Clear settings form fields
@@ -716,8 +718,27 @@ func (m model) convertTagMapToList() []string {
 
 func (m model) View() string {
 	if m.err != nil {
-		return fmt.Sprintf("Error: %v\nPress q to quit.", m.err)
+		var b strings.Builder
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("9")).Render("An error occurred"))
+		b.WriteString(fmt.Sprintf("\n\nType: %s\n", m.err.Type))
+		b.WriteString(fmt.Sprintf("Message: %s\n\n", m.err.Message))
+
+		switch m.err.Type {
+		case app.ErrTypeIO:
+			b.WriteString("Suggestion: Please check file permissions and ensure the file exists at the expected location.")
+		case app.ErrTypeValidation:
+			b.WriteString("Suggestion: Please check your input and try again. Ensure all required fields are filled correctly.")
+		case app.ErrTypeNotFound:
+			b.WriteString("Suggestion: The requested item could not be found. Please check the ID and try again.")
+		case app.ErrTypeInternal:
+			b.WriteString("Suggestion: An unexpected internal error occurred. Please check the logs for more details.")
+		}
+
+		b.WriteString("\n\nPress 'q' to quit.")
+		return b.String()
 	}
+
+
 
 	switch m.currentView {
 	case "main":
@@ -895,6 +916,7 @@ func (m model) View() string {
 func main() {
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
+		log.Error("Application failed:", err)
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}

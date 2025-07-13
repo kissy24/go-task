@@ -2,13 +2,13 @@ package app
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"go-task/internal/log"
 	"go-task/internal/store"
 	"go-task/internal/task"
 
@@ -24,7 +24,7 @@ type App struct {
 func NewApp() (*App, error) {
 	tasks, err := store.LoadTasks()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load tasks: %w", err)
+		return nil, NewAppError(ErrTypeIO, "Failed to load tasks from storage.", err)
 	}
 
 	// If no tasks are loaded and not in test environment, add some dummy data for demonstration
@@ -65,7 +65,7 @@ func NewApp() (*App, error) {
 		// Save dummy data if auto-save is enabled
 		if tasks.Settings.AutoSave {
 			if err := store.SaveTasks(tasks); err != nil {
-				return nil, fmt.Errorf("failed to auto-save dummy tasks: %w", err)
+				return nil, NewAppError(ErrTypeIO, "Failed to auto-save dummy tasks.", err)
 			}
 		}
 	}
@@ -77,18 +77,18 @@ func NewApp() (*App, error) {
 		go func() {
 			// 初回起動時に古いバックアップをクリーンアップ
 			if err := store.CleanOldBackups(); err != nil {
-				fmt.Fprintf(os.Stderr, "Error cleaning old backups: %v\n", err)
+				log.Error("Failed to clean old backups:", err)
 			}
 			// 1時間ごとにバックアップを実行
 			ticker := time.NewTicker(1 * time.Hour)
 			defer ticker.Stop()
 			for range ticker.C {
 				if err := store.CreateBackup(app.Tasks); err != nil {
-					fmt.Fprintf(os.Stderr, "Error creating backup: %v\n", err)
+					log.Error("Failed to create backup:", err)
 				} else {
 					// バックアップ成功後、古いバックアップをクリーンアップ
 					if err := store.CleanOldBackups(); err != nil {
-						fmt.Fprintf(os.Stderr, "Error cleaning old backups after new backup: %v\n", err)
+						log.Error("Failed to clean old backups after new backup:", err)
 					}
 				}
 			}
@@ -101,7 +101,7 @@ func NewApp() (*App, error) {
 // AddTask は新しいタスクを作成し、タスクリストに追加します。
 func (a *App) AddTask(title, description string, priority task.Priority, tags []string) (*task.Task, error) {
 	if title == "" {
-		return nil, errors.New("title cannot be empty")
+		return nil, NewAppError(ErrTypeValidation, "Title cannot be empty.", nil)
 	}
 
 	if priority == "" {
@@ -120,13 +120,15 @@ func (a *App) AddTask(title, description string, priority task.Priority, tags []
 	}
 
 	if err := newTask.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid task data: %w", err)
+		log.Error("Validation error on add:", err)
+		return nil, NewAppError(ErrTypeValidation, "Invalid task data.", err)
 	}
 
 	a.Tasks.Tasks = append(a.Tasks.Tasks, newTask)
 	if a.Tasks.Settings.AutoSave {
 		if err := store.SaveTasks(a.Tasks); err != nil {
-			return nil, fmt.Errorf("failed to auto-save tasks: %w", err)
+			log.Error("Failed to save tasks on add:", err)
+			return nil, NewAppError(ErrTypeIO, "Failed to auto-save tasks.", err)
 		}
 	}
 	return &newTask, nil
@@ -139,7 +141,7 @@ func (a *App) GetTaskByID(id string) (*task.Task, error) {
 			return &t, nil
 		}
 	}
-	return nil, fmt.Errorf("task with ID %s not found", id)
+	return nil, NewAppError(ErrTypeNotFound, fmt.Sprintf("Task with ID %s not found.", id), nil)
 }
 
 // UpdateTask は既存のタスクを更新します。
@@ -170,36 +172,40 @@ func (a *App) UpdateTask(id, title, description string, status task.Status, prio
 			a.Tasks.Tasks[i].UpdatedAt = time.Now()
 
 			if err := a.Tasks.Tasks[i].Validate(); err != nil {
-				return nil, fmt.Errorf("invalid task data after update: %w", err)
+				log.Error("Validation error on update:", err)
+				return nil, NewAppError(ErrTypeValidation, "Invalid task data after update.", err)
 			}
 
 			if a.Tasks.Settings.AutoSave {
 				if err := store.SaveTasks(a.Tasks); err != nil {
-					return nil, fmt.Errorf("failed to auto-save tasks: %w", err)
+					log.Error("Failed to save tasks on update:", err)
+					return nil, NewAppError(ErrTypeIO, "Failed to auto-save tasks.", err)
 				}
 			}
 			return &a.Tasks.Tasks[i], nil
 		}
 	}
-	return nil, fmt.Errorf("task with ID %s not found", id)
+	return nil, NewAppError(ErrTypeNotFound, fmt.Sprintf("Task with ID %s not found.", id), nil)
 }
 
 // ExportTasks は現在のタスクデータを指定されたファイルパスにJSON形式でエクスポートします。
 func (a *App) ExportTasks(filePath string) error {
 	if filePath == "" {
-		return errors.New("file path cannot be empty")
+		return NewAppError(ErrTypeValidation, "File path cannot be empty.", nil)
 	}
 
 	// タスクデータをJSON形式でマーシャル
 	data, err := store.MarshalTasks(a.Tasks)
 	if err != nil {
-		return fmt.Errorf("failed to marshal tasks for export: %w", err)
+		log.Error("Failed to marshal tasks for export:", err)
+		return NewAppError(ErrTypeInternal, "Failed to marshal tasks for export.", err)
 	}
 
 	// ファイルに書き込み
 	err = os.WriteFile(filePath, data, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to write exported data to file %s: %w", filePath, err)
+		log.Error("Failed to write export file:", err)
+		return NewAppError(ErrTypeIO, fmt.Sprintf("Failed to write exported data to file %s.", filePath), err)
 	}
 
 	return nil
@@ -212,13 +218,14 @@ func (a *App) DeleteTask(id string) error {
 			a.Tasks.Tasks = append(a.Tasks.Tasks[:i], a.Tasks.Tasks[i+1:]...)
 			if a.Tasks.Settings.AutoSave {
 				if err := store.SaveTasks(a.Tasks); err != nil {
-					return fmt.Errorf("failed to auto-save tasks after deletion: %w", err)
+					log.Error("Failed to save tasks on delete:", err)
+					return NewAppError(ErrTypeIO, "Failed to auto-save tasks after deletion.", err)
 				}
 			}
 			return nil
 		}
 	}
-	return fmt.Errorf("task with ID %s not found", id)
+	return NewAppError(ErrTypeNotFound, fmt.Sprintf("Task with ID %s not found.", id), nil)
 }
 
 // GetAllTasks は全てのタスクを返します。
@@ -366,21 +373,22 @@ func (a *App) GetAllUniqueTags() []string {
 }
 
 // ImportTasks は指定されたファイルパスからタスクデータをJSON形式でインポートします。
-// ImportTasks は指定されたファイルパスからタスクデータをJSON形式でインポートします。
 // 既存のタスクとの重複をチェックし、重複しないタスクのみを追加します。
 func (a *App) ImportTasks(filePath string) error {
 	if filePath == "" {
-		return errors.New("file path cannot be empty")
+		return NewAppError(ErrTypeValidation, "File path cannot be empty.", nil)
 	}
 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read import file %s: %w", filePath, err)
+		log.Error("Failed to read import file:", err)
+		return NewAppError(ErrTypeIO, fmt.Sprintf("Failed to read import file %s.", filePath), err)
 	}
 
 	var importedData task.Tasks
 	if err := json.Unmarshal(data, &importedData); err != nil {
-		return fmt.Errorf("failed to unmarshal imported data: %w", err)
+		log.Error("Failed to unmarshal import data:", err)
+		return NewAppError(ErrTypeInternal, "Failed to unmarshal imported data.", err)
 	}
 
 	// 重複チェック用のマップ
@@ -398,7 +406,7 @@ func (a *App) ImportTasks(filePath string) error {
 
 	if a.Tasks.Settings.AutoSave {
 		if err := store.SaveTasks(a.Tasks); err != nil {
-			return fmt.Errorf("failed to auto-save tasks after import: %w", err)
+			return NewAppError(ErrTypeIO, "Failed to auto-save tasks after import.", err)
 		}
 	}
 
@@ -408,17 +416,19 @@ func (a *App) ImportTasks(filePath string) error {
 // RestoreBackup は指定されたバックアップファイルからタスクデータを復元します。
 func (a *App) RestoreBackup(filePath string) error {
 	if filePath == "" {
-		return errors.New("file path cannot be empty")
+		return NewAppError(ErrTypeValidation, "File path cannot be empty.", nil)
 	}
 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read backup file %s: %w", filePath, err)
+		log.Error("Failed to read backup file:", err)
+		return NewAppError(ErrTypeIO, fmt.Sprintf("Failed to read backup file %s.", filePath), err)
 	}
 
 	var backupTasks task.Tasks
 	if err := json.Unmarshal(data, &backupTasks); err != nil {
-		return fmt.Errorf("failed to unmarshal backup data: %w", err)
+		log.Error("Failed to unmarshal backup data:", err)
+		return NewAppError(ErrTypeInternal, "Failed to unmarshal backup data.", err)
 	}
 
 	// 現在のタスクデータをバックアップデータで上書き
@@ -430,7 +440,7 @@ func (a *App) RestoreBackup(filePath string) error {
 
 	if a.Tasks.Settings.AutoSave {
 		if err := store.SaveTasks(a.Tasks); err != nil {
-			return fmt.Errorf("failed to auto-save tasks after restore: %w", err)
+			return NewAppError(ErrTypeIO, "Failed to auto-save tasks after restore.", err)
 		}
 	}
 

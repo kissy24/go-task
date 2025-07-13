@@ -914,113 +914,64 @@ func TestImportTasks(t *testing.T) {
 	}
 }
 
-func TestRestoreBackup(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "go-task_test_restore_")
+func TestErrorHandling(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "go-task_test_error_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 	setupTestEnv(t, tmpDir)
 
-	// Create an initial app with some tasks
 	app, err := NewApp()
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
-	app.AddTask("Original Task 1", "Desc 1", task.PriorityHigh, nil)
-	app.AddTask("Original Task 2", "Desc 2", task.PriorityMedium, nil)
-	initialTaskCount := len(app.GetAllTasks())
 
-	// Create a dummy backup file with different tasks and settings
-	backupFilePath := filepath.Join(tmpDir, "backup_tasks.json")
-	backupTasksData := &task.Tasks{
-		Version:   "1.1.0",
-		CreatedAt: time.Now().Add(-24 * time.Hour),
-		UpdatedAt: time.Now().Add(-24 * time.Hour),
-		Tasks: []task.Task{
-			{
-				ID:          "backup-task-id-1",
-				Title:       "Backup Task A",
-				Description: "From backup file",
-				Status:      task.StatusTODO,
-				Priority:    task.PriorityLow,
-				CreatedAt:   time.Now().Add(-48 * time.Hour),
-				UpdatedAt:   time.Now().Add(-48 * time.Hour),
-			},
-			{
-				ID:          "backup-task-id-2",
-				Title:       "Backup Task B",
-				Description: "Another backup task",
-				Status:      task.StatusDone,
-				Priority:    task.PriorityHigh,
-				CreatedAt:   time.Now().Add(-47 * time.Hour),
-				UpdatedAt:   time.Now().Add(-47 * time.Hour),
-			},
-		},
-		Settings: task.Settings{
-			DefaultPriority: task.PriorityHigh,
-			AutoSave:        false,
-			Theme:           "dark",
-		},
-	}
-
-	data, err := json.MarshalIndent(backupTasksData, "", "  ")
-	if err != nil {
-		t.Fatalf("Failed to marshal backup tasks: %v", err)
-	}
-	err = os.WriteFile(backupFilePath, data, 0600)
-	if err != nil {
-		t.Fatalf("Failed to write dummy backup file: %v", err)
-	}
-
-	// Test successful restore
-	err = app.RestoreBackup(backupFilePath)
-	if err != nil {
-		t.Fatalf("RestoreBackup() failed: %v", err)
-	}
-
-	// Verify tasks and settings after restore
-	restoredTasks := app.GetAllTasks()
-	if len(restoredTasks) != 2 { // Should be replaced by backup tasks
-		t.Errorf("Expected 2 tasks after restore, got %d", len(restoredTasks))
-	}
-	if restoredTasks[0].Title != "Backup Task A" || restoredTasks[1].Title != "Backup Task B" {
-		t.Errorf("Restored tasks content mismatch")
-	}
-	if app.Tasks.Version != "1.1.0" {
-		t.Errorf("Restored version mismatch: expected 1.1.0, got %s", app.Tasks.Version)
-	}
-	if app.Tasks.Settings.DefaultPriority != task.PriorityHigh {
-		t.Errorf("Restored default priority mismatch: expected %s, got %s", task.PriorityHigh, app.Tasks.Settings.DefaultPriority)
-	}
-	if app.Tasks.Settings.AutoSave != false {
-		t.Errorf("Restored auto save mismatch: expected false, got %t", app.Tasks.Settings.AutoSave)
-	}
-	if app.Tasks.Settings.Theme != "dark" {
-		t.Errorf("Restored theme mismatch: expected dark, got %s", app.Tasks.Settings.Theme)
-	}
-
-	// Test restore with empty file path
-	err = app.RestoreBackup("")
+	// Test AddTask with empty title
+	_, err = app.AddTask("", "desc", task.PriorityLow, nil)
 	if err == nil {
-		t.Errorf("RestoreBackup() expected error for empty file path, got nil")
+		t.Error("Expected validation error for empty title, got nil")
+	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeValidation {
+		t.Errorf("Expected validation error, got %T: %v", err, err)
 	}
 
-	// Test restore with non-existent file
-	err = app.RestoreBackup(filepath.Join(tmpDir, "non_existent_backup.json"))
+	// Test GetTaskByID with non-existent ID
+	_, err = app.GetTaskByID("non-existent")
 	if err == nil {
-		t.Errorf("RestoreBackup() expected error for non-existent file, got nil")
+		t.Error("Expected not found error, got nil")
+	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeNotFound {
+		t.Errorf("Expected not found error, got %T: %v", err, err)
 	}
 
-	// Test restore with invalid JSON
-	invalidJsonPath := filepath.Join(tmpDir, "invalid_backup.json")
-	err = os.WriteFile(invalidJsonPath, []byte("{invalid json"), 0600)
-	if err != nil {
-		t.Fatalf("Failed to write invalid json file: %v", err)
-	}
-	err = app.RestoreBackup(invalidJsonPath)
+	// Test UpdateTask with non-existent ID
+	_, err = app.UpdateTask("non-existent", "title", "", "", "", nil)
 	if err == nil {
-		t.Errorf("RestoreBackup() expected error for invalid JSON, got nil")
+		t.Error("Expected not found error, got nil")
+	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeNotFound {
+		t.Errorf("Expected not found error, got %T: %v", err, err)
 	}
-	_ = initialTaskCount // Suppress unused variable warning
+
+	// Test DeleteTask with non-existent ID
+	err = app.DeleteTask("non-existent")
+	if err == nil {
+		t.Error("Expected not found error, got nil")
+	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeNotFound {
+		t.Errorf("Expected not found error, got %T: %v", err, err)
+	}
+
+	// Test ExportTasks with empty path
+	err = app.ExportTasks("")
+	if err == nil {
+		t.Error("Expected validation error for empty path, got nil")
+	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeValidation {
+		t.Errorf("Expected validation error, got %T: %v", err, err)
+	}
+
+	// Test ImportTasks with non-existent path
+	err = app.ImportTasks("non-existent.json")
+	if err == nil {
+		t.Error("Expected IO error for non-existent file, got nil")
+	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeIO {
+		t.Errorf("Expected IO error, got %T: %v", err, err)
+	}
 }
