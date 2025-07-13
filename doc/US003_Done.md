@@ -183,7 +183,7 @@ func setupTestEnv(t *testing.T, tempDir string) {
 }
 
 func TestNewApp(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_app_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_app_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestNewApp(t *testing.T) {
 }
 
 func TestAddTask(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_add_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_add_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestAddTask(t *testing.T) {
 }
 
 func TestGetTaskByID(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_get_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_get_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestGetTaskByID(t *testing.T) {
 }
 
 func TestUpdateTask(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_update_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_update_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -335,7 +335,7 @@ func TestUpdateTask(t *testing.T) {
 }
 
 func TestDeleteTask(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_delete_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_delete_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestDeleteTask(t *testing.T) {
 }
 
 func TestGetAllTasks(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_getall_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_getall_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}

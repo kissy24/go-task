@@ -4,7 +4,7 @@
 
 ### 1.1 プロジェクト名
 
-Zan - 軽量高速タスク管理システム
+Go-Task - 軽量高速タスク管理システム
 
 ### 1.2 プロジェクトの目的
 
@@ -147,7 +147,7 @@ Zan - 軽量高速タスク管理システム
 ### 5.2 データ保存方式
 
 - ファイル形式: JSON
-- 保存場所: `~/.zan/tasks.json`
+- 保存場所: `~/.go-task/tasks.json`
 - バックアップ: 定期的な自動バックアップ
 - 同期: 単一ファイルでの管理
 
@@ -205,47 +205,47 @@ Zan - 軽量高速タスク管理システム
 
 ```sh
 # アプリケーション起動
-zan
+go-task
 
 # タスク追加
-zan add "タスクタイトル" --description "詳細説明" --priority high --tags "開発,緊急"
+go-task add "タスクタイトル" --description "詳細説明" --priority high --tags "開発,緊急"
 
 # タスク一覧表示
-zan list --status todo --priority high
+go-task list --status todo --priority high
 
 # タスク詳細表示
-zan show <task-id>
+go-task show <task-id>
 
 # タスク編集
-zan edit <task-id>
+go-task edit <task-id>
 
 # タスク完了
-zan complete <task-id>
+go-task complete <task-id>
 
 # タスク削除
-zan delete <task-id>
+go-task delete <task-id>
 
 # データエクスポート
-zan export --output ./tasks.json
+go-task export --output ./tasks.json
 
 # データインポート
-zan import --file ./tasks.json
+go-task import --file ./tasks.json
 ```
 
 ### 7.2 高度なコマンド
 
 ```sh
 # 検索
-zan search "キーワード"
+go-task search "キーワード"
 
 # フィルタリング
-zan filter --status done --priority high --tags "開発"
+go-task filter --status done --priority high --tags "開発"
 
 # 統計表示
-zan stats
+go-task stats
 
 # 設定変更
-zan config --theme dark --auto-save true
+go-task config --theme dark --auto-save true
 ```
 
 ## 8. セキュリティ要件

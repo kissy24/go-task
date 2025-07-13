@@ -25,13 +25,13 @@ func (a *App) GetTaskByID(id string) (*task.Task, error) {
 }
 ```
 
-`cmd/zan/main.go` に `showTask` 関数を実装し、タスクの詳細表示を行えるようにしました。
+`cmd/go-task/main.go` に `showTask` 関数を実装し、タスクの詳細表示を行えるようにしました。
 - `showTask` 関数は、引数からタスクIDを取得し、`appInstance.GetTaskByID()` を呼び出してタスクを取得します。
 - 取得したタスクの全ての属性（ID, Title, Description, Status, Priority, Tags, CreatedAt, UpdatedAt, CompletedAt）を整理された形式で表示します。
 - 存在しないIDが指定された場合は、適切なエラーメッセージを標準エラー出力に表示します。
 
 ```go
-// cmd/zan/main.go (抜粋)
+// cmd/go-task/main.go (抜粋)
 func showTask(cmd *cobra.Command, args []string) {
 	id := args[0]
 	t, err := appInstance.GetTaskByID(id)
@@ -62,7 +62,7 @@ func showTask(cmd *cobra.Command, args []string) {
 ```go
 // internal/app/app_test.go (抜粋)
 func TestGetTaskByID(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_get_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_get_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}

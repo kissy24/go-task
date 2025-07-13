@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"zan/internal/app"
-	"zan/internal/store"
-	"zan/internal/task"
+	"go-task/internal/app"
+	"go-task/internal/store"
+	"go-task/internal/task"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -18,11 +18,18 @@ func TestMain(m *testing.M) {
 	configDir, _ := store.GetConfigDirPath()
 	os.RemoveAll(configDir) // ディレクトリごと削除
 
+	// テスト環境変数を設定
+	oldTestEnv := os.Getenv("GO_TASK_TEST_ENV")
+	os.Setenv("GO_TASK_TEST_ENV", "true")
+
 	// テスト実行
 	code := m.Run()
 
 	// テスト後にディレクトリごと削除
 	os.RemoveAll(configDir)
+
+	// 環境変数を元に戻す
+	os.Setenv("GO_TASK_TEST_ENV", oldTestEnv)
 	os.Exit(code)
 }
 
@@ -211,7 +218,7 @@ func TestView(t *testing.T) {
 	if !strings.Contains(view, expectedStats) {
 		t.Errorf("View missing stats. Expected: %s, Got: %s", expectedStats, view)
 	}
-	if !strings.Contains(view, "[a]dd [e]dit [d]elete [v]iew [f]ilter [q]uit [h]elp") {
+	if !strings.Contains(view, "[a]dd [e]dit [d]elete [v]iew [c]omplete [f]ilter [p]riority filter [t]ag filter [s]earch [o]sort [g]settings [x]export [i]import [q]uit [h]elp") {
 		t.Errorf("View missing footer menu")
 	}
 }

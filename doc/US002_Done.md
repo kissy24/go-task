@@ -2,7 +2,7 @@
 
 ## 完了定義
 
-- [x] `~/.zan/tasks.json` にデータが保存される
+- [x] `~/.go-task/tasks.json` にデータが保存される
 - [x] ディレクトリが存在しない場合は自動作成される
 - [x] ファイル権限が適切に設定される (600)
 
@@ -12,8 +12,8 @@
 
 `internal/store/store.go` に以下の関数を実装しました。
 
-- `GetConfigDirPath()`: 設定ディレクトリのパス (`~/.zan`) を取得します。
-- `GetDataFilePath()`: データファイルのパス (`~/.zan/tasks.json`) を取得します。
+- `GetConfigDirPath()`: 設定ディレクトリのパス (`~/.go-task`) を取得します。
+- `GetDataFilePath()`: データファイルのパス (`~/.go-task/tasks.json`) を取得します。
 - `EnsureDataDirExists()`: データディレクトリが存在しない場合に `0700` の権限で作成します。
 - `LoadTasks()`: データファイルからタスクデータを読み込みます。ファイルが存在しない場合は初期データ構造を返します。
 - `SaveTasks()`: タスクデータをデータファイルに `0600` の権限で保存します。
@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	dataDir  = ".zan"
+	dataDir  = ".go-task"
 	dataFile = "tasks.json"
 	filePerm os.FileMode = 0600
 	dirPerm  os.FileMode = 0700
@@ -169,7 +169,7 @@ func setupTestEnv(t *testing.T, tempDir string) {
 }
 
 func TestGetConfigDirPath(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_config_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_config_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestGetConfigDirPath(t *testing.T) {
 }
 
 func TestGetDataFilePath(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_data_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_data_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestGetDataFilePath(t *testing.T) {
 }
 
 func TestEnsureDataDirExists(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_ensure_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_ensure_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestEnsureDataDirExists(t *testing.T) {
 }
 
 func TestLoadAndSaveTasks(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_loadsave_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_loadsave_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}

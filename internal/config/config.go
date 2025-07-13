@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"sync"
 
-	"zan/internal/task"
+	"go-task/internal/task"
 )
 
 const (
 	ConfigFileName = "config.json"
-	ConfigDir      = ".zan"
+	ConfigDir      = ".go-task"
 )
 
 type Settings struct {

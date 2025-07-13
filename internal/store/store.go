@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"zan/internal/task"
+	"go-task/internal/task"
 )
 
 const (
-	dataDir                          = ".zan"
+	dataDir                          = ".go-task"
 	dataFile                         = "tasks.json"
 	backupDir                        = "backup"
 	backupFileTimeLayout             = "20060102150405" // YYYYMMDDhhmmss

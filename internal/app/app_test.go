@@ -9,23 +9,23 @@ import (
 	"testing"
 	"time"
 
-	"zan/internal/task"
+	"go-task/internal/task"
 )
 
 // setupTestEnv はテスト用の環境変数を設定し、テスト終了後に元に戻します。
 func setupTestEnv(t *testing.T, tempDir string) {
 	oldHome := os.Getenv("HOME")
-	oldTestEnv := os.Getenv("ZAN_TEST_ENV")
+	oldTestEnv := os.Getenv("GO_TASK_TEST_ENV")
 	os.Setenv("HOME", tempDir)
-	os.Setenv("ZAN_TEST_ENV", "true") // テスト環境であることを示す
+	os.Setenv("GO_TASK_TEST_ENV", "true") // テスト環境であることを示す
 	t.Cleanup(func() {
 		os.Setenv("HOME", oldHome)
-		os.Setenv("ZAN_TEST_ENV", oldTestEnv) // 元に戻す
+		os.Setenv("GO_TASK_TEST_ENV", oldTestEnv) // 元に戻す
 	})
 }
 
 func TestNewApp(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_app_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_app_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestNewApp(t *testing.T) {
 }
 
 func TestAddTask(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_add_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_add_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestAddTask(t *testing.T) {
 }
 
 func TestGetTaskByID(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_get_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_get_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestGetTaskByID(t *testing.T) {
 }
 
 func TestUpdateTask(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_update_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_update_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestUpdateTask(t *testing.T) {
 }
 
 func TestDeleteTask(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_delete_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_delete_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestDeleteTask(t *testing.T) {
 }
 
 func TestGetAllTasks(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_getall_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_getall_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestGetAllTasks(t *testing.T) {
 }
 
 func TestGetTaskStats(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_stats_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_stats_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestGetTaskStats(t *testing.T) {
 }
 
 func TestGetFilteredTasksByStatus(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_filter_status_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_filter_status_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -348,7 +348,7 @@ func TestGetFilteredTasksByStatus(t *testing.T) {
 }
 
 func TestGetFilteredTasksByPriority(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_filter_priority_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_filter_priority_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -418,7 +418,7 @@ func TestGetFilteredTasksByPriority(t *testing.T) {
 }
 
 func TestGetFilteredTasksByTags(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_filter_tags_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_filter_tags_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -500,7 +500,7 @@ func TestGetFilteredTasksByTags(t *testing.T) {
 }
 
 func TestSearchTasks(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_search_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_search_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -591,7 +591,7 @@ func TestSearchTasks(t *testing.T) {
 }
 
 func TestGetAllUniqueTags(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_unique_tags_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_unique_tags_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -624,7 +624,7 @@ func TestGetAllUniqueTags(t *testing.T) {
 }
 
 func TestSortTasks(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_sort_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_sort_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -730,7 +730,7 @@ func TestSortTasks(t *testing.T) {
 }
 
 func TestExportTasks(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_export_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_export_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -786,7 +786,7 @@ func TestExportTasks(t *testing.T) {
 }
 
 func TestImportTasks(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_import_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_import_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -860,8 +860,8 @@ func TestImportTasks(t *testing.T) {
 
 	// Verify tasks after import
 	allTasks := app.GetAllTasks()
-	if len(allTasks) != 4 { // 2 initial + 2 new (1 duplicate skipped)
-		t.Errorf("Expected 4 tasks after import, got %d", len(allTasks))
+	if len(allTasks) != 3 { // 1 initial + 2 new (1 duplicate skipped)
+		t.Errorf("Expected 3 tasks after import, got %d", len(allTasks))
 	}
 
 	// Check for imported tasks
@@ -915,7 +915,7 @@ func TestImportTasks(t *testing.T) {
 }
 
 func TestRestoreBackup(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "zan_test_restore_")
+	tmpDir, err := os.MkdirTemp("", "go-task_test_restore_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}

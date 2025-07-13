@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"zan/internal/store"
-	"zan/internal/task"
+	"go-task/internal/store"
+	"go-task/internal/task"
 
 	"github.com/google/uuid"
 )
@@ -28,7 +28,7 @@ func NewApp() (*App, error) {
 	}
 
 	// If no tasks are loaded and not in test environment, add some dummy data for demonstration
-	if len(tasks.Tasks) == 0 && os.Getenv("ZAN_TEST_ENV") != "true" {
+	if len(tasks.Tasks) == 0 && os.Getenv("GO_TASK_TEST_ENV") != "true" {
 		now := time.Now()
 		tasks.Tasks = []task.Task{
 			{

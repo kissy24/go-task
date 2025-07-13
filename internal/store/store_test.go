@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"zan/internal/task"
+	"go-task/internal/task"
 )
 
 // setupTestEnv はテスト用の環境変数を設定し、テスト終了後に元に戻します。
@@ -20,7 +20,7 @@ func setupTestEnv(t *testing.T, tempDir string) {
 }
 
 func TestGetConfigDirPath(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_config_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_config_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestGetConfigDirPath(t *testing.T) {
 }
 
 func TestGetDataFilePath(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_data_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_data_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestGetDataFilePath(t *testing.T) {
 }
 
 func TestEnsureDataDirExists(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_ensure_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_ensure_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestEnsureDataDirExists(t *testing.T) {
 }
 
 func TestLoadAndSaveTasks(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_loadsave_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_loadsave_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}

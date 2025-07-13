@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"zan/internal/app"
-	"zan/internal/config"
-	"zan/internal/task"
+	"go-task/internal/app"
+	"go-task/internal/config"
+	"go-task/internal/task"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"

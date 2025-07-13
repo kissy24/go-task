@@ -28,20 +28,20 @@ func (a *App) GetTaskStats() (total, completed, incomplete int) {
 }
 ```
 
-`cmd/zan/main.go` に `listTasks` 関数を実装し、タスクの一覧表示と統計情報の表示を行えるようにしました。
+`cmd/go-task/main.go` に `listTasks` 関数を実装し、タスクの一覧表示と統計情報の表示を行えるようにしました。
 - `listTasks` 関数は、`appInstance.GetAllTasks()` で全タスクを取得し、`appInstance.GetTaskStats()` で統計情報を取得します。
 - 各タスクはID、状態アイコン、優先度（色付き）、タイトルがテーブル形式で表示されます。
 - 画面下部には合計、未完了、完了のタスク数が表示されます。
 - 状態アイコンと優先度カラーはそれぞれ `getStatusIcon` と `getPriorityColor` 関数で定義しています。
 
 ```go
-// cmd/zan/main.go (抜粋)
+// cmd/go-task/main.go (抜粋)
 func listTasks(cmd *cobra.Command, args []string) {
 	tasks := appInstance.GetAllTasks()
 	total, completed, incomplete := appInstance.GetTaskStats()
 
 	if len(tasks) == 0 {
-		fmt.Println("No tasks found. Add a new task using 'zan add <title>'")
+		fmt.Println("No tasks found. Add a new task using 'go-task add <title>'")
 		return
 	}
 
@@ -99,7 +99,7 @@ func getPriorityColor(priority task.Priority) string {
 ```go
 // internal/app/app_test.go (抜粋)
 func TestGetTaskStats(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_stats_")
+	tmpDir, err := ioutil.TempDir("", "go-task_test_stats_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}

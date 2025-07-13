@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"zan/internal/task"
+	"go-task/internal/task"
 )
 
 func TestGetConfigFilePath(t *testing.T) {
