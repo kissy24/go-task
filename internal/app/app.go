@@ -194,6 +194,16 @@ func (a *App) ExportTasks(filePath string) error {
 		return NewAppError(ErrTypeValidation, "File path cannot be empty.", nil)
 	}
 
+	// パスが安全であることを確認
+	safe, err := store.IsPathSafe(filePath)
+	if err != nil {
+		log.Error("Failed to check path safety for export:", err)
+		return NewAppError(ErrTypeInternal, "Failed to validate export path.", err)
+	}
+	if !safe {
+		return NewAppError(ErrTypeValidation, "Export path is outside of allowed directory.", nil)
+	}
+
 	// タスクデータをJSON形式でマーシャル
 	data, err := store.MarshalTasks(a.Tasks)
 	if err != nil {
@@ -379,6 +389,16 @@ func (a *App) ImportTasks(filePath string) error {
 		return NewAppError(ErrTypeValidation, "File path cannot be empty.", nil)
 	}
 
+	// パスが安全であることを確認
+	safe, err := store.IsPathSafe(filePath)
+	if err != nil {
+		log.Error("Failed to check path safety for import:", err)
+		return NewAppError(ErrTypeInternal, "Failed to validate import path.", err)
+	}
+	if !safe {
+		return NewAppError(ErrTypeValidation, "Import path is outside of allowed directory.", nil)
+	}
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		log.Error("Failed to read import file:", err)
@@ -417,6 +437,16 @@ func (a *App) ImportTasks(filePath string) error {
 func (a *App) RestoreBackup(filePath string) error {
 	if filePath == "" {
 		return NewAppError(ErrTypeValidation, "File path cannot be empty.", nil)
+	}
+
+	// パスが安全であることを確認
+	safe, err := store.IsPathSafe(filePath)
+	if err != nil {
+		log.Error("Failed to check path safety for restore:", err)
+		return NewAppError(ErrTypeInternal, "Failed to validate restore path.", err)
+	}
+	if !safe {
+		return NewAppError(ErrTypeValidation, "Restore path is outside of allowed directory.", nil)
 	}
 
 	data, err := os.ReadFile(filePath)

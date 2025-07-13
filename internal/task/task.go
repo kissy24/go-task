@@ -63,6 +63,11 @@ func (t *Task) Validate() error {
 	if t.Title == "" {
 		return errors.New("Task title cannot be empty")
 	}
+
+	// サニタイズ: タイトルと説明から制御文字を除去
+	t.Title = sanitizeString(t.Title)
+	t.Description = sanitizeString(t.Description)
+
 	switch t.Status {
 	case StatusTODO, StatusInProgress, StatusDone, StatusPending:
 		// 有効なステータス
@@ -76,6 +81,16 @@ func (t *Task) Validate() error {
 		return fmt.Errorf("Invalid task priority: %s", t.Priority)
 	}
 	return nil
+}
+
+// sanitizeString は文字列から制御文字を除去します。
+func sanitizeString(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 0x20 || r == 0x09 || r == 0x0A || r == 0x0D { // 0x20はスペース、0x09はタブ、0x0AはLF、0x0DはCR
+			return r
+		}
+		return -1 // 制御文字を除去
+	}, s)
 }
 
 // SearchTasks はキーワードに基づいてタスクを検索します。

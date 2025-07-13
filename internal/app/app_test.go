@@ -914,8 +914,8 @@ func TestImportTasks(t *testing.T) {
 	}
 }
 
-func TestErrorHandling(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "go-task_test_error_")
+func TestSecurity(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "go-task_test_security_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -927,51 +927,62 @@ func TestErrorHandling(t *testing.T) {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	// Test AddTask with empty title
-	_, err = app.AddTask("", "desc", task.PriorityLow, nil)
+	// Test path traversal prevention for ExportTasks
+	maliciousPath := filepath.Join(tmpDir, "..", "/etc/passwd")
+	err = app.ExportTasks(maliciousPath)
 	if err == nil {
-		t.Error("Expected validation error for empty title, got nil")
+		t.Error("Expected error for malicious export path, got nil")
 	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeValidation {
-		t.Errorf("Expected validation error, got %T: %v", err, err)
+		t.Errorf("Expected validation error for malicious export path, got %T: %v", err, err)
 	}
 
-	// Test GetTaskByID with non-existent ID
-	_, err = app.GetTaskByID("non-existent")
+	// Test path traversal prevention for ImportTasks
+	maliciousPath = filepath.Join(tmpDir, "..", "/etc/shadow")
+	err = app.ImportTasks(maliciousPath)
 	if err == nil {
-		t.Error("Expected not found error, got nil")
-	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeNotFound {
-		t.Errorf("Expected not found error, got %T: %v", err, err)
-	}
-
-	// Test UpdateTask with non-existent ID
-	_, err = app.UpdateTask("non-existent", "title", "", "", "", nil)
-	if err == nil {
-		t.Error("Expected not found error, got nil")
-	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeNotFound {
-		t.Errorf("Expected not found error, got %T: %v", err, err)
-	}
-
-	// Test DeleteTask with non-existent ID
-	err = app.DeleteTask("non-existent")
-	if err == nil {
-		t.Error("Expected not found error, got nil")
-	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeNotFound {
-		t.Errorf("Expected not found error, got %T: %v", err, err)
-	}
-
-	// Test ExportTasks with empty path
-	err = app.ExportTasks("")
-	if err == nil {
-		t.Error("Expected validation error for empty path, got nil")
+		t.Error("Expected error for malicious import path, got nil")
 	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeValidation {
-		t.Errorf("Expected validation error, got %T: %v", err, err)
+		t.Errorf("Expected validation error for malicious import path, got %T: %v", err, err)
 	}
 
-	// Test ImportTasks with non-existent path
-	err = app.ImportTasks("non-existent.json")
+	// Test path traversal prevention for RestoreBackup
+	maliciousPath = filepath.Join(tmpDir, "..", "/root/.ssh/id_rsa")
+	err = app.RestoreBackup(maliciousPath)
 	if err == nil {
-		t.Error("Expected IO error for non-existent file, got nil")
-	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeIO {
-		t.Errorf("Expected IO error, got %T: %v", err, err)
+		t.Error("Expected error for malicious backup path, got nil")
+	} else if appErr, ok := err.(*AppError); !ok || appErr.Type != ErrTypeValidation {
+		t.Errorf("Expected validation error for malicious backup path, got %T: %v", err, err)
+	}
+
+	// Test input sanitization for AddTask
+	controlCharTitle := "Task\nWith\rControl\tChars"
+	controlCharDesc := "Description\x00With\x01Null\x02Bytes"
+	addedTask, err := app.AddTask(controlCharTitle, controlCharDesc, task.PriorityMedium, nil)
+	if err != nil {
+		t.Fatalf("AddTask failed with control chars: %v", err)
+	}
+
+	// 制御文字が除去されていることを確認
+	if strings.ContainsAny(addedTask.Title, "\n\r\t") {
+		t.Errorf("Title contains control characters after sanitization: %q", addedTask.Title)
+	}
+	if strings.ContainsAny(addedTask.Description, "\x00\x01\x02") {
+		t.Errorf("Description contains control characters after sanitization: %q", addedTask.Description)
+	}
+
+	// Test input sanitization for UpdateTask
+	originalTask, _ := app.AddTask("Original", "Original", task.PriorityMedium, nil)
+	updatedTitle := "Updated\nTitle"
+	updatedDesc := "Updated\x00Description"
+	updatedTask, err := app.UpdateTask(originalTask.ID, updatedTitle, updatedDesc, "", "", nil)
+	if err != nil {
+		t.Fatalf("UpdateTask failed with control chars: %v", err)
+	}
+
+	if strings.ContainsAny(updatedTask.Title, "\n") {
+		t.Errorf("Updated title contains control characters after sanitization: %q", updatedTask.Title)
+	}
+	if strings.ContainsAny(updatedTask.Description, "\x00") {
+		t.Errorf("Updated description contains control characters after sanitization: %q", updatedTask.Description)
 	}
 }

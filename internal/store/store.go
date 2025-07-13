@@ -215,3 +215,18 @@ func CleanOldBackups() error {
 	}
 	return nil
 }
+
+// IsPathSafe は指定されたパスがアプリケーションのデータディレクトリ内にあるかを確認します。
+func IsPathSafe(p string) (bool, error) {
+	dataDirPath, err := GetConfigDirPath()
+	if err != nil {
+		return false, fmt.Errorf("failed to get config directory path: %w", err)
+	}
+
+	absolutePath, err := filepath.Abs(p)
+	if err != nil {
+		return false, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	return strings.HasPrefix(absolutePath, dataDirPath), nil
+}
