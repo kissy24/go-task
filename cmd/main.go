@@ -34,14 +34,15 @@ var (
 )
 
 type model struct {
-	app            *app.App
-	tasks          []task.Task
-	cursor         int
-	selected       map[string]struct{} // selected task IDs
-	currentView    string
-	err            *app.AppError // Use custom error type
-	detailViewTask *task.Task     // Currently viewed task in detail view
-	cfg            *config.Config // Application configuration
+	app             *app.App
+	tasks           []task.Task
+	cursor          int
+	selected        map[string]struct{} // selected task IDs
+	currentView     string
+	err             *app.AppError  // Use custom error type
+	detailViewTask  *task.Task     // Currently viewed task in detail view
+	cfg             *config.Config // Application configuration
+	helpViewContent string         // Content for the help view
 
 	// Filter fields
 	filterStatusInput textinput.Model
@@ -215,6 +216,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+		case "h": // Show help
+			if m.currentView == "main" {
+				m.currentView = "help"
+				m.helpViewContent = m.generateHelpText()
+				return m, nil
+			}
+
 		case "a": // Add task
 			if m.currentView == "main" {
 				m.currentView = "add"
@@ -320,7 +328,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "esc":
-			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" || m.currentView == "filter_tags" || m.currentView == "search" || m.currentView == "sort" || m.currentView == "detail" || m.currentView == "settings" || m.currentView == "export" || m.currentView == "import" {
+			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" || m.currentView == "filter_tags" || m.currentView == "search" || m.currentView == "sort" || m.currentView == "detail" || m.currentView == "settings" || m.currentView == "export" || m.currentView == "import" || m.currentView == "help" {
 				m.currentView = "main"
 				// Clear form fields
 				m.titleInput.SetValue("")
@@ -717,6 +725,35 @@ func (m model) convertTagMapToList() []string {
 	return tags
 }
 
+// generateHelpText はヘルプビューに表示するテキストを生成します。
+func (m model) generateHelpText() string {
+	var b strings.Builder
+	b.WriteString("GoTask CLI Help\n\n")
+	b.WriteString("Commands:\n")
+	b.WriteString("  [a]dd: Add a new task\n")
+	b.WriteString("  [e]dit: Edit the selected task\n")
+	b.WriteString("  [d]elete: Delete the selected task\n")
+	b.WriteString("  [v]iew: View details of the selected task\n")
+	b.WriteString("  [c]omplete: Change status of the selected task (cycle through TODO, IN_PROGRESS, DONE, PENDING)\n")
+	b.WriteString("  [f]ilter: Filter tasks by status\n")
+	b.WriteString("  [p]riority filter: Filter tasks by priority\n")
+	b.WriteString("  [t]ag filter: Filter tasks by tags\n")
+	b.WriteString("  [s]earch: Search tasks by keyword\n")
+	b.WriteString("  [o]sort: Sort tasks by various criteria\n")
+	b.WriteString("  [g]settings: Access application settings\n")
+	b.WriteString("  [x]export: Export tasks to a JSON file\n")
+	b.WriteString("  [i]import: Import tasks from a JSON file\n")
+	b.WriteString("  [q]uit: Quit the application\n")
+	b.WriteString("  [h]elp: Show this help message\n")
+	b.WriteString("\nNavigation:\n")
+	b.WriteString("  [up]/[down] arrows: Move cursor in main view\n")
+	b.WriteString("  [tab]/[shift+tab]: Navigate form fields\n")
+	b.WriteString("  [enter]: Submit form or select item\n")
+	b.WriteString("  [esc]: Go back to main view or cancel current operation\n")
+	b.WriteString("\nPress [esc] to return to main view.\n")
+	return b.String()
+}
+
 func (m model) View() string {
 	if m.err != nil {
 		var b strings.Builder
@@ -738,8 +775,6 @@ func (m model) View() string {
 		b.WriteString("\n\nPress 'q' to quit.")
 		return b.String()
 	}
-
-
 
 	switch m.currentView {
 	case "main":
@@ -909,6 +944,8 @@ func (m model) View() string {
 			m.importInput.View(),
 			"[enter] to import, [esc] to cancel",
 		)
+	case "help":
+		return m.helpViewContent + "\n"
 	}
 
 	return "Unknown view"

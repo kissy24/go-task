@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"go-task/internal/store"
 	"go-task/internal/task"
 )
 
@@ -746,7 +747,11 @@ func TestExportTasks(t *testing.T) {
 	app.AddTask("Task 1", "Description 1", task.PriorityHigh, []string{"tag1"})
 	app.AddTask("Task 2", "Description 2", task.PriorityMedium, []string{"tag2"})
 
-	exportFilePath := filepath.Join(tmpDir, "exported_tasks.json")
+	configDir, err := store.GetConfigDirPath()
+	if err != nil {
+		t.Fatalf("Failed to get config dir path: %v", err)
+	}
+	exportFilePath := filepath.Join(configDir, "exported_tasks.json")
 
 	// Test successful export
 	err = app.ExportTasks(exportFilePath)
@@ -802,7 +807,11 @@ func TestImportTasks(t *testing.T) {
 	initialTask1, _ := app.AddTask("Initial Task 1", "", task.PriorityMedium, nil)
 
 	// Create a dummy import file
-	importFilePath := filepath.Join(tmpDir, "import_tasks.json")
+	configDir, err := store.GetConfigDirPath()
+	if err != nil {
+		t.Fatalf("Failed to get config dir path: %v", err)
+	}
+	importFilePath := filepath.Join(configDir, "import_tasks.json")
 	dummyTasks := &task.Tasks{
 		Version:   "1.0.0",
 		CreatedAt: time.Now(),
@@ -970,11 +979,24 @@ func TestSecurity(t *testing.T) {
 		t.Errorf("Description contains control characters after sanitization: %q", addedTask.Description)
 	}
 
+	// Test input sanitization for tags in AddTask
+	controlCharTags := []string{"tag1\n", "tag2\r", "tag3\t", "tag4\x00"}
+	addedTaskWithTags, err := app.AddTask("Task with control char tags", "Description", task.PriorityMedium, controlCharTags)
+	if err != nil {
+		t.Fatalf("AddTask failed with control char tags: %v", err)
+	}
+	for _, tag := range addedTaskWithTags.Tags {
+		if strings.ContainsAny(tag, "\n\r\t\x00") {
+			t.Errorf("Tag contains control characters after sanitization: %q", tag)
+		}
+	}
+
 	// Test input sanitization for UpdateTask
 	originalTask, _ := app.AddTask("Original", "Original", task.PriorityMedium, nil)
 	updatedTitle := "Updated\nTitle"
 	updatedDesc := "Updated\x00Description"
-	updatedTask, err := app.UpdateTask(originalTask.ID, updatedTitle, updatedDesc, "", "", nil)
+	updatedTags := []string{"Updated\nTag1", "Updated\x00Tag2"}
+	updatedTask, err := app.UpdateTask(originalTask.ID, updatedTitle, updatedDesc, "", "", updatedTags)
 	if err != nil {
 		t.Fatalf("UpdateTask failed with control chars: %v", err)
 	}
@@ -984,5 +1006,10 @@ func TestSecurity(t *testing.T) {
 	}
 	if strings.ContainsAny(updatedTask.Description, "\x00") {
 		t.Errorf("Updated description contains control characters after sanitization: %q", updatedTask.Description)
+	}
+	for _, tag := range updatedTask.Tags {
+		if strings.ContainsAny(tag, "\n\x00") {
+			t.Errorf("Updated tag contains control characters after sanitization: %q", tag)
+		}
 	}
 }

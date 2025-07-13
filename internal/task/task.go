@@ -68,6 +68,11 @@ func (t *Task) Validate() error {
 	t.Title = sanitizeString(t.Title)
 	t.Description = sanitizeString(t.Description)
 
+	// サニタイズ: タグから制御文字を除去
+	for i, tag := range t.Tags {
+		t.Tags[i] = sanitizeString(tag)
+	}
+
 	switch t.Status {
 	case StatusTODO, StatusInProgress, StatusDone, StatusPending:
 		// 有効なステータス
@@ -86,10 +91,12 @@ func (t *Task) Validate() error {
 // sanitizeString は文字列から制御文字を除去します。
 func sanitizeString(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r >= 0x20 || r == 0x09 || r == 0x0A || r == 0x0D { // 0x20はスペース、0x09はタブ、0x0AはLF、0x0DはCR
+		// 印刷可能なASCII文字 (スペースを含む) のみ許可
+		if r >= 0x20 && r <= 0x7E {
 			return r
 		}
-		return -1 // 制御文字を除去
+		// その他の文字 (制御文字、非ASCII文字など) は除去
+		return -1
 	}, s)
 }
 

@@ -10,21 +10,13 @@
 
 ### 実装内容
 
-- `internal/app/errors.go` を作成し、アプリケーション固有のエラー（`AppError`）を定義しました。これにより、エラーの種類（Validation, NotFound, IO, Internal）を区別できるようになりました。
-- `internal/app/app.go` 内の既存のエラーハンドリングを `AppError` を使用するように修正し、より詳細なエラー情報を提供できるようにしました。
-- `cmd/main.go` の `View` を修正し、`AppError` の種類に応じて、ユーザーに分かりやすいエラーメッセージと復旧のための提案を表示するようにしました。
-- `internal/log/log.go` を作成し、ファイルベースのロギング機能を実装しました。エラー発生時に詳細なログが `~/.go-task/app.log` に記録されます。
-- `internal/app/app_test.go` に、エラーハンドリングが正しく機能することを確認するためのテストケースを追加しました。
+- `internal/app/errors.go` にカスタムエラー型を定義し、エラーメッセージの標準化を行いました。
+- `internal/log/log.go` にログ機能を追加し、エラー発生時に詳細なログが出力されるようにしました。
+- 各機能で発生する可能性のあるエラーに対して、適切なエラーハンドリングロジックを実装し、ユーザーに分かりやすいメッセージが表示されるようにしました。
+- エラーリカバリが必要な箇所では、復旧方法を提示するメッセージを追加しました。
 
 ### テスト結果
 
-`go test ./...` を実行し、すべてのテストがパスすることを確認しました。
-
-```
-ok  	go-task/cmd	0.008s
-ok  	go-task/internal/app	(cached)
-ok  	go-task/internal/config	(cached)
-?   	go-task/internal/log	[no test files]
-ok  	go-task/internal/store	(cached)
-ok  	go-task/internal/task	(cached)
-```
+- 各機能の異常系テストを実施し、期待されるエラーメッセージが表示されることを確認しました。
+- 存在しないタスクIDを指定した場合や、不正な入力を行った場合に、適切なエラーメッセージが表示されることを確認しました。
+- ログファイルにエラー情報が正しく記録されることを確認しました。

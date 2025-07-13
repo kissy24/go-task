@@ -143,3 +143,62 @@ func TestLoadAndSaveTasks(t *testing.T) {
 		t.Errorf("Expected file permission %o, got %o", filePerm, info.Mode().Perm())
 	}
 }
+
+func TestIsPathSafe(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "go-task_test_path_safe_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	setupTestEnv(t, tmpDir)
+
+	// データディレクトリ内にファイルを作成
+	configDir, _ := GetConfigDirPath()
+	os.MkdirAll(configDir, 0700)
+	safeFilePath := filepath.Join(configDir, "testfile.json")
+	ioutil.WriteFile(safeFilePath, []byte("test"), 0600)
+
+	tests := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		{
+			name:     "Safe path within data directory",
+			path:     safeFilePath,
+			expected: true,
+		},
+		{
+			name:     "Path outside data directory",
+			path:     filepath.Join(tmpDir, "another_file.json"),
+			expected: false,
+		},
+		{
+			name:     "Directory traversal attempt (up one level)",
+			path:     filepath.Join(configDir, "..", "malicious.json"),
+			expected: false,
+		},
+		{
+			name:     "Directory traversal attempt (absolute path outside)",
+			path:     "/tmp/malicious.json",
+			expected: false,
+		},
+		{
+			name:     "Subdirectory within data directory",
+			path:     filepath.Join(configDir, "sub", "file.json"),
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			safe, err := IsPathSafe(tt.path)
+			if err != nil {
+				t.Fatalf("IsPathSafe() error = %v", err)
+			}
+			if safe != tt.expected {
+				t.Errorf("IsPathSafe(%q) = %v, want %v", tt.path, safe, tt.expected)
+			}
+		})
+	}
+}
