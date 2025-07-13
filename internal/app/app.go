@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -69,7 +70,32 @@ func NewApp() (*App, error) {
 		}
 	}
 
-	return &App{Tasks: tasks}, nil
+	app := &App{Tasks: tasks}
+
+	// 自動バックアップが有効な場合、バックアップ処理をスケジュール
+	if app.Tasks.Settings.AutoSave {
+		go func() {
+			// 初回起動時に古いバックアップをクリーンアップ
+			if err := store.CleanOldBackups(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error cleaning old backups: %v\n", err)
+			}
+			// 1時間ごとにバックアップを実行
+			ticker := time.NewTicker(1 * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
+				if err := store.CreateBackup(app.Tasks); err != nil {
+					fmt.Fprintf(os.Stderr, "Error creating backup: %v\n", err)
+				} else {
+					// バックアップ成功後、古いバックアップをクリーンアップ
+					if err := store.CleanOldBackups(); err != nil {
+						fmt.Fprintf(os.Stderr, "Error cleaning old backups after new backup: %v\n", err)
+					}
+				}
+			}
+		}()
+	}
+
+	return app, nil
 }
 
 // AddTask は新しいタスクを作成し、タスクリストに追加します。
@@ -156,6 +182,27 @@ func (a *App) UpdateTask(id, title, description string, status task.Status, prio
 		}
 	}
 	return nil, fmt.Errorf("task with ID %s not found", id)
+}
+
+// ExportTasks は現在のタスクデータを指定されたファイルパスにJSON形式でエクスポートします。
+func (a *App) ExportTasks(filePath string) error {
+	if filePath == "" {
+		return errors.New("file path cannot be empty")
+	}
+
+	// タスクデータをJSON形式でマーシャル
+	data, err := store.MarshalTasks(a.Tasks)
+	if err != nil {
+		return fmt.Errorf("failed to marshal tasks for export: %w", err)
+	}
+
+	// ファイルに書き込み
+	err = os.WriteFile(filePath, data, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to write exported data to file %s: %w", filePath, err)
+	}
+
+	return nil
 }
 
 // DeleteTask は指定されたIDのタスクを削除します。
@@ -316,4 +363,76 @@ func (a *App) GetAllUniqueTags() []string {
 	}
 	sort.Strings(tags) // タグをアルファベット順にソート
 	return tags
+}
+
+// ImportTasks は指定されたファイルパスからタスクデータをJSON形式でインポートします。
+// ImportTasks は指定されたファイルパスからタスクデータをJSON形式でインポートします。
+// 既存のタスクとの重複をチェックし、重複しないタスクのみを追加します。
+func (a *App) ImportTasks(filePath string) error {
+	if filePath == "" {
+		return errors.New("file path cannot be empty")
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read import file %s: %w", filePath, err)
+	}
+
+	var importedData task.Tasks
+	if err := json.Unmarshal(data, &importedData); err != nil {
+		return fmt.Errorf("failed to unmarshal imported data: %w", err)
+	}
+
+	// 重複チェック用のマップ
+	existingTaskIDs := make(map[string]bool)
+	for _, t := range a.Tasks.Tasks {
+		existingTaskIDs[t.ID] = true
+	}
+
+	for _, importedTask := range importedData.Tasks {
+		if _, exists := existingTaskIDs[importedTask.ID]; !exists {
+			// IDが重複しないタスクのみ追加
+			a.Tasks.Tasks = append(a.Tasks.Tasks, importedTask)
+		}
+	}
+
+	if a.Tasks.Settings.AutoSave {
+		if err := store.SaveTasks(a.Tasks); err != nil {
+			return fmt.Errorf("failed to auto-save tasks after import: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// RestoreBackup は指定されたバックアップファイルからタスクデータを復元します。
+func (a *App) RestoreBackup(filePath string) error {
+	if filePath == "" {
+		return errors.New("file path cannot be empty")
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read backup file %s: %w", filePath, err)
+	}
+
+	var backupTasks task.Tasks
+	if err := json.Unmarshal(data, &backupTasks); err != nil {
+		return fmt.Errorf("failed to unmarshal backup data: %w", err)
+	}
+
+	// 現在のタスクデータをバックアップデータで上書き
+	a.Tasks.Tasks = backupTasks.Tasks
+	a.Tasks.Version = backupTasks.Version
+	a.Tasks.CreatedAt = backupTasks.CreatedAt
+	a.Tasks.UpdatedAt = time.Now()          // 復元日時を更新日時とする
+	a.Tasks.Settings = backupTasks.Settings // 設定も復元
+
+	if a.Tasks.Settings.AutoSave {
+		if err := store.SaveTasks(a.Tasks); err != nil {
+			return fmt.Errorf("failed to auto-save tasks after restore: %w", err)
+		}
+	}
+
+	return nil
 }

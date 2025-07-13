@@ -1,8 +1,9 @@
 package app
 
 import (
-	"io/ioutil"
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -24,7 +25,7 @@ func setupTestEnv(t *testing.T, tempDir string) {
 }
 
 func TestNewApp(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_app_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_app_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -44,7 +45,7 @@ func TestNewApp(t *testing.T) {
 }
 
 func TestAddTask(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_add_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_add_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -95,7 +96,7 @@ func TestAddTask(t *testing.T) {
 }
 
 func TestGetTaskByID(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_get_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_get_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestGetTaskByID(t *testing.T) {
 }
 
 func TestUpdateTask(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_update_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_update_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -176,7 +177,7 @@ func TestUpdateTask(t *testing.T) {
 }
 
 func TestDeleteTask(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_delete_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_delete_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -212,7 +213,7 @@ func TestDeleteTask(t *testing.T) {
 }
 
 func TestGetAllTasks(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_getall_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_getall_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -234,7 +235,7 @@ func TestGetAllTasks(t *testing.T) {
 }
 
 func TestGetTaskStats(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_stats_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_stats_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -265,7 +266,7 @@ func TestGetTaskStats(t *testing.T) {
 }
 
 func TestGetFilteredTasksByStatus(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_filter_status_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_filter_status_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -347,7 +348,7 @@ func TestGetFilteredTasksByStatus(t *testing.T) {
 }
 
 func TestGetFilteredTasksByPriority(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_filter_priority_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_filter_priority_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -417,7 +418,7 @@ func TestGetFilteredTasksByPriority(t *testing.T) {
 }
 
 func TestGetFilteredTasksByTags(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_filter_tags_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_filter_tags_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -499,7 +500,7 @@ func TestGetFilteredTasksByTags(t *testing.T) {
 }
 
 func TestSearchTasks(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_search_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_search_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -590,7 +591,7 @@ func TestSearchTasks(t *testing.T) {
 }
 
 func TestGetAllUniqueTags(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_unique_tags_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_unique_tags_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -623,7 +624,7 @@ func TestGetAllUniqueTags(t *testing.T) {
 }
 
 func TestSortTasks(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "zan_test_sort_")
+	tmpDir, err := os.MkdirTemp("", "zan_test_sort_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -726,4 +727,300 @@ func TestSortTasks(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExportTasks(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "zan_test_export_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	setupTestEnv(t, tmpDir)
+
+	app, err := NewApp()
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	// Add some tasks to export
+	app.AddTask("Task 1", "Description 1", task.PriorityHigh, []string{"tag1"})
+	app.AddTask("Task 2", "Description 2", task.PriorityMedium, []string{"tag2"})
+
+	exportFilePath := filepath.Join(tmpDir, "exported_tasks.json")
+
+	// Test successful export
+	err = app.ExportTasks(exportFilePath)
+	if err != nil {
+		t.Fatalf("ExportTasks() failed: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(exportFilePath); os.IsNotExist(err) {
+		t.Errorf("Exported file does not exist at %s", exportFilePath)
+	}
+
+	// Verify file content (basic check)
+	data, err := os.ReadFile(exportFilePath)
+	if err != nil {
+		t.Fatalf("Failed to read exported file: %v", err)
+	}
+
+	var exportedTasks task.Tasks
+	err = json.Unmarshal(data, &exportedTasks)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal exported data: %v", err)
+	}
+
+	if len(exportedTasks.Tasks) != 2 {
+		t.Errorf("Expected 2 tasks in exported file, got %d", len(exportedTasks.Tasks))
+	}
+	if exportedTasks.Tasks[0].Title != "Task 1" || exportedTasks.Tasks[1].Title != "Task 2" {
+		t.Errorf("Exported tasks content mismatch")
+	}
+
+	// Test export with empty file path
+	err = app.ExportTasks("")
+	if err == nil {
+		t.Errorf("ExportTasks() expected error for empty file path, got nil")
+	}
+}
+
+func TestImportTasks(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "zan_test_import_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	setupTestEnv(t, tmpDir)
+
+	app, err := NewApp()
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	// Add some initial tasks to the app
+	initialTask1, _ := app.AddTask("Initial Task 1", "", task.PriorityMedium, nil)
+
+	// Create a dummy import file
+	importFilePath := filepath.Join(tmpDir, "import_tasks.json")
+	dummyTasks := &task.Tasks{
+		Version:   "1.0.0",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Tasks: []task.Task{
+			{
+				ID:          initialTask1.ID, // Duplicate ID
+				Title:       "Duplicate Task 1",
+				Description: "This should not be imported",
+				Status:      task.StatusTODO,
+				Priority:    task.PriorityHigh,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			{
+				ID:          "new-task-id-3",
+				Title:       "Imported Task 3",
+				Description: "New task from import",
+				Status:      task.StatusTODO,
+				Priority:    task.PriorityMedium,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			{
+				ID:          "new-task-id-4",
+				Title:       "Imported Task 4",
+				Description: "Another new task",
+				Status:      task.StatusDone,
+				Priority:    task.PriorityLow,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+		},
+		Settings: task.Settings{
+			DefaultPriority: task.PriorityMedium,
+			AutoSave:        true,
+			Theme:           "default",
+		},
+	}
+
+	data, err := json.MarshalIndent(dummyTasks, "", "  ")
+	if err != nil {
+		t.Fatalf("Failed to marshal dummy tasks: %v", err)
+	}
+	err = os.WriteFile(importFilePath, data, 0600)
+	if err != nil {
+		t.Fatalf("Failed to write dummy import file: %v", err)
+	}
+
+	// Test successful import
+	err = app.ImportTasks(importFilePath)
+	if err != nil {
+		t.Fatalf("ImportTasks() failed: %v", err)
+	}
+
+	// Verify tasks after import
+	allTasks := app.GetAllTasks()
+	if len(allTasks) != 4 { // 2 initial + 2 new (1 duplicate skipped)
+		t.Errorf("Expected 4 tasks after import, got %d", len(allTasks))
+	}
+
+	// Check for imported tasks
+	foundImported3 := false
+	foundImported4 := false
+	foundDuplicate1 := false
+	for _, t := range allTasks {
+		if t.ID == "new-task-id-3" && t.Title == "Imported Task 3" {
+			foundImported3 = true
+		}
+		if t.ID == "new-task-id-4" && t.Title == "Imported Task 4" {
+			foundImported4 = true
+		}
+		if t.ID == initialTask1.ID && t.Title == initialTask1.Title { // Ensure original task is still there, not overwritten by duplicate
+			foundDuplicate1 = true
+		}
+	}
+
+	if !foundImported3 {
+		t.Errorf("Imported Task 3 not found")
+	}
+	if !foundImported4 {
+		t.Errorf("Imported Task 4 not found")
+	}
+	if !foundDuplicate1 {
+		t.Errorf("Original Task 1 was overwritten or not found")
+	}
+
+	// Test import with empty file path
+	err = app.ImportTasks("")
+	if err == nil {
+		t.Errorf("ImportTasks() expected error for empty file path, got nil")
+	}
+
+	// Test import with non-existent file
+	err = app.ImportTasks(filepath.Join(tmpDir, "non_existent.json"))
+	if err == nil {
+		t.Errorf("ImportTasks() expected error for non-existent file, got nil")
+	}
+
+	// Test import with invalid JSON
+	invalidJsonPath := filepath.Join(tmpDir, "invalid.json")
+	err = os.WriteFile(invalidJsonPath, []byte("{invalid json"), 0600)
+	if err != nil {
+		t.Fatalf("Failed to write invalid json file: %v", err)
+	}
+	err = app.ImportTasks(invalidJsonPath)
+	if err == nil {
+		t.Errorf("ImportTasks() expected error for invalid JSON, got nil")
+	}
+}
+
+func TestRestoreBackup(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "zan_test_restore_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	setupTestEnv(t, tmpDir)
+
+	// Create an initial app with some tasks
+	app, err := NewApp()
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	app.AddTask("Original Task 1", "Desc 1", task.PriorityHigh, nil)
+	app.AddTask("Original Task 2", "Desc 2", task.PriorityMedium, nil)
+	initialTaskCount := len(app.GetAllTasks())
+
+	// Create a dummy backup file with different tasks and settings
+	backupFilePath := filepath.Join(tmpDir, "backup_tasks.json")
+	backupTasksData := &task.Tasks{
+		Version:   "1.1.0",
+		CreatedAt: time.Now().Add(-24 * time.Hour),
+		UpdatedAt: time.Now().Add(-24 * time.Hour),
+		Tasks: []task.Task{
+			{
+				ID:          "backup-task-id-1",
+				Title:       "Backup Task A",
+				Description: "From backup file",
+				Status:      task.StatusTODO,
+				Priority:    task.PriorityLow,
+				CreatedAt:   time.Now().Add(-48 * time.Hour),
+				UpdatedAt:   time.Now().Add(-48 * time.Hour),
+			},
+			{
+				ID:          "backup-task-id-2",
+				Title:       "Backup Task B",
+				Description: "Another backup task",
+				Status:      task.StatusDone,
+				Priority:    task.PriorityHigh,
+				CreatedAt:   time.Now().Add(-47 * time.Hour),
+				UpdatedAt:   time.Now().Add(-47 * time.Hour),
+			},
+		},
+		Settings: task.Settings{
+			DefaultPriority: task.PriorityHigh,
+			AutoSave:        false,
+			Theme:           "dark",
+		},
+	}
+
+	data, err := json.MarshalIndent(backupTasksData, "", "  ")
+	if err != nil {
+		t.Fatalf("Failed to marshal backup tasks: %v", err)
+	}
+	err = os.WriteFile(backupFilePath, data, 0600)
+	if err != nil {
+		t.Fatalf("Failed to write dummy backup file: %v", err)
+	}
+
+	// Test successful restore
+	err = app.RestoreBackup(backupFilePath)
+	if err != nil {
+		t.Fatalf("RestoreBackup() failed: %v", err)
+	}
+
+	// Verify tasks and settings after restore
+	restoredTasks := app.GetAllTasks()
+	if len(restoredTasks) != 2 { // Should be replaced by backup tasks
+		t.Errorf("Expected 2 tasks after restore, got %d", len(restoredTasks))
+	}
+	if restoredTasks[0].Title != "Backup Task A" || restoredTasks[1].Title != "Backup Task B" {
+		t.Errorf("Restored tasks content mismatch")
+	}
+	if app.Tasks.Version != "1.1.0" {
+		t.Errorf("Restored version mismatch: expected 1.1.0, got %s", app.Tasks.Version)
+	}
+	if app.Tasks.Settings.DefaultPriority != task.PriorityHigh {
+		t.Errorf("Restored default priority mismatch: expected %s, got %s", task.PriorityHigh, app.Tasks.Settings.DefaultPriority)
+	}
+	if app.Tasks.Settings.AutoSave != false {
+		t.Errorf("Restored auto save mismatch: expected false, got %t", app.Tasks.Settings.AutoSave)
+	}
+	if app.Tasks.Settings.Theme != "dark" {
+		t.Errorf("Restored theme mismatch: expected dark, got %s", app.Tasks.Settings.Theme)
+	}
+
+	// Test restore with empty file path
+	err = app.RestoreBackup("")
+	if err == nil {
+		t.Errorf("RestoreBackup() expected error for empty file path, got nil")
+	}
+
+	// Test restore with non-existent file
+	err = app.RestoreBackup(filepath.Join(tmpDir, "non_existent_backup.json"))
+	if err == nil {
+		t.Errorf("RestoreBackup() expected error for non-existent file, got nil")
+	}
+
+	// Test restore with invalid JSON
+	invalidJsonPath := filepath.Join(tmpDir, "invalid_backup.json")
+	err = os.WriteFile(invalidJsonPath, []byte("{invalid json"), 0600)
+	if err != nil {
+		t.Fatalf("Failed to write invalid json file: %v", err)
+	}
+	err = app.RestoreBackup(invalidJsonPath)
+	if err == nil {
+		t.Errorf("RestoreBackup() expected error for invalid JSON, got nil")
+	}
+	_ = initialTaskCount // Suppress unused variable warning
 }

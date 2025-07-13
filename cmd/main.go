@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"zan/internal/app"
+	"zan/internal/config"
 	"zan/internal/task"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -37,7 +38,8 @@ type model struct {
 	selected       map[string]struct{} // selected task IDs
 	currentView    string
 	err            error
-	detailViewTask *task.Task // Currently viewed task in detail view
+	detailViewTask *task.Task     // Currently viewed task in detail view
+	cfg            *config.Config // Application configuration
 
 	// Filter fields
 	filterStatusInput textinput.Model
@@ -63,10 +65,27 @@ type model struct {
 	priorityInput    textinput.Model
 	tagsInput        textinput.Model
 	focusIndex       int // Which input field is focused
+
+	// Settings form fields
+	defaultPriorityInput textinput.Model
+	autoSaveInput        textinput.Model
+	themeInput           textinput.Model
+	settingsFocusIndex   int // Which input field is focused in settings view
+
+	// Export form fields
+	exportInput textinput.Model
+
+	// Import form fields
+	importInput textinput.Model
 }
 
 func initialModel() model {
 	a, err := app.NewApp()
+	if err != nil {
+		return model{err: err}
+	}
+
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		return model{err: err}
 	}
@@ -117,27 +136,49 @@ func initialModel() model {
 	sortInput.CharLimit = 50
 	sortInput.Width = 50
 
+	// Settings input fields
+	dpi := textinput.New()
+	dpi.Placeholder = fmt.Sprintf("Default Priority (e.g., %s, %s, %s)", task.PriorityHigh, task.PriorityMedium, task.PriorityLow)
+	dpi.CharLimit = 10
+	dpi.Width = 50
+
+	asi := textinput.New()
+	asi.Placeholder = "Auto Save (true/false)"
+	asi.CharLimit = 5
+	asi.Width = 50
+
+	themeInput := textinput.New()
+	themeInput.Placeholder = "Theme (e.g., default, dark)"
+	themeInput.CharLimit = 20
+	themeInput.Width = 50
+
 	return model{
-		app:                 a,
-		tasks:               a.GetAllTasks(),
-		selected:            make(map[string]struct{}),
-		currentView:         "main", // "main", "add", "edit", "detail", "filter", "filter_priority", "filter_tags", "search", "sort"
-		titleInput:          ti,
-		descriptionInput:    di,
-		priorityInput:       pi,
-		tagsInput:           tai,
-		focusIndex:          0,
-		filterStatusInput:   fsi,
-		filteredStatuses:    make(map[task.Status]struct{}),
-		isFiltering:         false,
-		filterPriorityInput: fpi,
-		filteredPriorities:  make(map[task.Priority]struct{}),
-		filterTagsInput:     fti,
-		filteredTags:        make(map[string]struct{}),
-		searchInput:         si,
-		sortInput:           sortInput,
-		sortBy:              "created_at", // Default sort by created_at
-		sortAsc:             false,        // Default sort descending
+		app:                  a,
+		tasks:                a.GetAllTasks(),
+		selected:             make(map[string]struct{}),
+		currentView:          "main", // "main", "add", "edit", "detail", "filter", "filter_priority", "filter_tags", "search", "sort"
+		titleInput:           ti,
+		descriptionInput:     di,
+		priorityInput:        pi,
+		tagsInput:            tai,
+		focusIndex:           0,
+		filterStatusInput:    fsi,
+		filteredStatuses:     make(map[task.Status]struct{}),
+		isFiltering:          false,
+		filterPriorityInput:  fpi,
+		filteredPriorities:   make(map[task.Priority]struct{}),
+		filterTagsInput:      fti,
+		filteredTags:         make(map[string]struct{}),
+		searchInput:          si,
+		sortInput:            sortInput,
+		sortBy:               "created_at", // Default sort by created_at
+		sortAsc:              false,        // Default sort descending
+		cfg:                  cfg,
+		defaultPriorityInput: dpi,
+		autoSaveInput:        asi,
+		themeInput:           themeInput,
+		exportInput:          textinput.New(),
+		importInput:          textinput.New(),
 	}
 }
 
@@ -164,11 +205,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
+		case "i": // Import tasks
+			if m.currentView == "main" {
+				m.currentView = "import"
+				m.importInput.Focus()
+				return m, nil
+			}
+
 		case "a": // Add task
 			if m.currentView == "main" {
 				m.currentView = "add"
 				m.titleInput.Focus()
 				m.focusIndex = 0
+				return m, nil
+			}
+
+		case "g": // Go to settings
+			if m.currentView == "main" {
+				m.currentView = "settings"
+				m.defaultPriorityInput.SetValue(string(m.cfg.Settings.DefaultPriority))
+				m.autoSaveInput.SetValue(fmt.Sprintf("%t", m.cfg.Settings.AutoSave))
+				m.themeInput.SetValue(m.cfg.Settings.Theme)
+				m.settingsFocusIndex = 0
+				m.defaultPriorityInput.Focus()
 				return m, nil
 			}
 
@@ -258,7 +317,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "esc":
-			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" || m.currentView == "filter_tags" || m.currentView == "search" || m.currentView == "sort" || m.currentView == "detail" {
+			if m.currentView == "add" || m.currentView == "edit" || m.currentView == "filter" || m.currentView == "filter_priority" || m.currentView == "filter_tags" || m.currentView == "search" || m.currentView == "sort" || m.currentView == "detail" || m.currentView == "settings" || m.currentView == "export" || m.currentView == "import" {
 				m.currentView = "main"
 				// Clear form fields
 				m.titleInput.SetValue("")
@@ -289,17 +348,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.detailViewTask = nil                 // Clear selected task for detail view
 				m.tasks = m.app.GetAllTasks()          // Reset tasks to all tasks
 				m.selected = make(map[string]struct{}) // Clear selection
+
+				// Clear settings form fields
+				m.defaultPriorityInput.SetValue("")
+				m.autoSaveInput.SetValue("")
+				m.themeInput.SetValue("")
+				m.defaultPriorityInput.Blur()
+				m.autoSaveInput.Blur()
+				m.themeInput.Blur()
 				return m, nil
 			}
 
 		case "up", "shift+tab":
-			if m.currentView == "add" || m.currentView == "edit" { // editビューも追加
+			if m.currentView == "add" || m.currentView == "edit" {
 				m.focusIndex--
-				// Wrap around
 				if m.focusIndex < 0 {
 					m.focusIndex = 3
 				}
 				cmds = append(cmds, m.setFocus())
+			} else if m.currentView == "settings" {
+				m.settingsFocusIndex--
+				if m.settingsFocusIndex < 0 {
+					m.settingsFocusIndex = 2
+				}
+				cmds = append(cmds, m.setSettingsFocus())
 			} else if m.currentView == "main" {
 				if m.cursor > 0 {
 					m.cursor--
@@ -307,13 +379,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "tab":
-			if m.currentView == "add" || m.currentView == "edit" { // editビューも追加
+			if m.currentView == "add" || m.currentView == "edit" {
 				m.focusIndex++
-				// Wrap around
 				if m.focusIndex > 3 {
 					m.focusIndex = 0
 				}
 				cmds = append(cmds, m.setFocus())
+			} else if m.currentView == "settings" {
+				m.settingsFocusIndex++
+				if m.settingsFocusIndex > 2 {
+					m.settingsFocusIndex = 0
+				}
+				cmds = append(cmds, m.setSettingsFocus())
 			} else if m.currentView == "main" {
 				if m.cursor < len(m.tasks)-1 {
 					m.cursor++
@@ -472,6 +549,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sortInput.SetValue("")
 				m.sortInput.Blur()
 				return m, tea.Batch(cmds...)
+			} else if m.currentView == "settings" {
+				// Save settings
+				defaultPriority := task.Priority(strings.ToUpper(m.defaultPriorityInput.Value()))
+				autoSaveStr := strings.ToLower(m.autoSaveInput.Value())
+				theme := m.themeInput.Value()
+
+				autoSave := false
+				if autoSaveStr == "true" {
+					autoSave = true
+				}
+
+				m.cfg.Settings.DefaultPriority = defaultPriority
+				m.cfg.Settings.AutoSave = autoSave
+				m.cfg.Settings.Theme = theme
+
+				err := m.cfg.SaveConfig()
+				if err != nil {
+					m.err = err
+				} else {
+					m.currentView = "main"
+					// Clear settings form fields
+					m.defaultPriorityInput.SetValue("")
+					m.autoSaveInput.SetValue("")
+					m.themeInput.SetValue("")
+					m.defaultPriorityInput.Blur()
+					m.autoSaveInput.Blur()
+					m.themeInput.Blur()
+				}
+				return m, tea.Batch(cmds...)
 			} else if m.currentView == "main" {
 				if len(m.tasks) > 0 {
 					taskID := m.tasks[m.cursor].ID
@@ -483,7 +589,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-		case " ": // Spacebar for main view selection
+		case " ": // Space bar for main view selection
 			if m.currentView == "main" {
 				if len(m.tasks) > 0 {
 					taskID := m.tasks[m.cursor].ID
@@ -493,6 +599,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					} else {
 						m.selected[taskID] = struct{}{}
 					}
+				} else if m.currentView == "settings" {
+					switch m.settingsFocusIndex {
+					case 0:
+						m.defaultPriorityInput, cmd = m.defaultPriorityInput.Update(msg)
+					case 1:
+						m.autoSaveInput, cmd = m.autoSaveInput.Update(msg)
+					case 2:
+						m.themeInput, cmd = m.themeInput.Update(msg)
+					}
+					cmds = append(cmds, cmd)
 				}
 			}
 		}
@@ -526,6 +642,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	} else if m.currentView == "sort" {
 		m.sortInput, cmd = m.sortInput.Update(msg)
 		cmds = append(cmds, cmd)
+	} else if m.currentView == "import" {
+		m.importInput, cmd = m.importInput.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	// Return the updated model to the Bubble Tea runtime for processing.
@@ -543,6 +662,23 @@ func (m *model) setFocus() tea.Cmd {
 			inputs[i].TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 		} else {
 			// Remove focused state
+			inputs[i].Blur()
+			inputs[i].PromptStyle = lipgloss.NewStyle()
+			inputs[i].TextStyle = lipgloss.NewStyle()
+		}
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *model) setSettingsFocus() tea.Cmd {
+	cmds := make([]tea.Cmd, 3)
+	inputs := []*textinput.Model{&m.defaultPriorityInput, &m.autoSaveInput, &m.themeInput}
+	for i := 0; i <= len(inputs)-1; i++ {
+		if i == m.settingsFocusIndex {
+			cmds[i] = inputs[i].Focus()
+			inputs[i].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+			inputs[i].TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+		} else {
 			inputs[i].Blur()
 			inputs[i].PromptStyle = lipgloss.NewStyle()
 			inputs[i].TextStyle = lipgloss.NewStyle()
@@ -628,22 +764,14 @@ func (m model) View() string {
 					cursor = ">"
 				}
 
-				// checked := " " // 未使用のためコメントアウト
-				if _, ok := m.selected[t.ID]; ok {
-					// checked = "x" // 未使用のためコメントアウト
-				}
-
 				// 色とアイコンを適用
 				statusIcon := statusIcons[t.Status]
 				priorityColor := priorityColors[t.Priority]
 				// 検索キーワードのハイライト
 				displayTitle := t.Title
-				displayDescription := t.Description
 				if m.searchKeyword != "" {
 					// タイトル内のキーワードをハイライト
 					displayTitle = strings.ReplaceAll(displayTitle, m.searchKeyword, lipgloss.NewStyle().Background(lipgloss.Color("205")).Render(m.searchKeyword))
-					// 説明内のキーワードをハイライト
-					displayDescription = strings.ReplaceAll(displayDescription, m.searchKeyword, lipgloss.NewStyle().Background(lipgloss.Color("205")).Render(m.searchKeyword))
 				}
 
 				styledTitle := lipgloss.NewStyle().Foreground(priorityColor).Render(displayTitle)
@@ -660,7 +788,7 @@ func (m model) View() string {
 			}
 			return "desc"
 		}())
-		s += "[a]dd [e]dit [d]elete [v]iew [c]omplete [f]ilter [p]riority filter [t]ag filter [s]earch [o]sort [q]uit [h]elp\n"
+		s += "[a]dd [e]dit [d]elete [v]iew [c]omplete [f]ilter [p]riority filter [t]ag filter [s]earch [o]sort [g]settings [x]export [i]import [q]uit [h]elp\n"
 		return s
 
 	case "detail":
@@ -738,6 +866,26 @@ func (m model) View() string {
 			"Sort Tasks (e.g., created_at asc, priority desc)\n\n%s\n\n%s",
 			m.sortInput.View(),
 			"[enter] to apply sort, [esc] to cancel",
+		)
+	case "settings":
+		return fmt.Sprintf(
+			"Settings\n\n%s\n%s\n%s\n\n%s",
+			m.defaultPriorityInput.View(),
+			m.autoSaveInput.View(),
+			m.themeInput.View(),
+			"[enter] to save, [esc] to cancel",
+		)
+	case "export":
+		return fmt.Sprintf(
+			"Export Tasks to JSON (e.g., /path/to/tasks.json)\n\n%s\n\n%s",
+			m.exportInput.View(),
+			"[enter] to export, [esc] to cancel",
+		)
+	case "import":
+		return fmt.Sprintf(
+			"Import Tasks from JSON (e.g., /path/to/tasks.json)\n\n%s\n\n%s",
+			m.importInput.View(),
+			"[enter] to import, [esc] to cancel",
 		)
 	}
 
